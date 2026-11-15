@@ -49,7 +49,9 @@ describe('cadastros (HU-03 a HU-05)', () => {
     it('CA2: desativar não apaga a instituição nem as contas', async () => {
       const inst = await instituicao();
       await post('/api/contas', { instituicaoId: inst.id, nome: 'Cartão', tipo: 'cartao', finalidade: 'gasto', diaFechamento: 1, diaVencimento: 9 }).expect(201);
-      await patch(`/api/instituicoes/${inst.id}`, { ativa: false }).expect(200);
+      const desativada = (await patch(`/api/instituicoes/${inst.id}`, { ativa: false }).expect(200)).body;
+      expect(desativada).toEqual({ id: inst.id, nome: 'Nubank', cor: '#8A05BE', ativa: false });
+      await patch('/api/instituicoes/00000000-0000-0000-0000-000000000000', { ativa: false }).expect(404);
 
       expect((await get('/api/instituicoes').expect(200)).body).toHaveLength(0);
       expect((await get('/api/contas').expect(200)).body).toHaveLength(0);

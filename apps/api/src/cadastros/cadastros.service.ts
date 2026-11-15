@@ -3,6 +3,7 @@ import { DataSource, type EntityManager } from 'typeorm';
 import { type Data, hoje, somarDias } from '../calendario/datas.js';
 import { CiclosService } from '../calendario/ciclos.service.js';
 import { type Autor, Escrita } from '../auditoria/escrita.js';
+import { alterar } from '../comum/banco.js';
 import { traduzirErroDoBanco } from '../comum/erros.js';
 import { type FaturaDaCompra, faturaDaCompra } from '../faturas/regras.js';
 import { DESDE_SEMPRE, type Finalidade, type TipoDeConta } from './esquemas.js';
@@ -91,13 +92,14 @@ export class CadastrosService {
   ): Promise<Instituicao> {
     const linha = await this.escrita
       .executar(autor, async (m) => {
-        const [r] = await m.query(
+        const [r] = await alterar<Instituicao>(
+          m,
           `UPDATE instituicao SET
              nome = coalesce($2, nome), cor = coalesce($3, cor), ativa = coalesce($4, ativa), atualizado_em = now()
            WHERE id = $1 RETURNING id, nome, cor, ativa`,
           [id, dados.nome ?? null, dados.cor ?? null, dados.ativa ?? null],
         );
-        return r as Instituicao | undefined;
+        return r;
       })
       .catch((e) => traduzirErroDoBanco(e, MENSAGENS));
     if (!linha) throw new NotFoundException('Instituição não encontrada');

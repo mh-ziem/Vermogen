@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { alterar } from '../comum/banco.js';
 
 export interface TokenMcp {
   id: string;
@@ -61,7 +62,8 @@ export class TokensService {
   }
 
   async revogar(id: string): Promise<boolean> {
-    const linhas = await this.db.query(
+    const linhas = await alterar(
+      this.db,
       `UPDATE token_mcp SET revogado_em = now() WHERE id = $1 AND revogado_em IS NULL RETURNING id`,
       [id],
     );
