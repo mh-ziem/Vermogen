@@ -3,20 +3,15 @@ import { onMounted, ref } from 'vue'
 import { chamar, ErroDeApi } from '@/api/http'
 import type { Ciclo } from '@/api/tipos'
 import AppShell from '@/components/AppShell.vue'
+import CategoriasRegras from '@/components/CategoriasRegras.vue'
 import InfoIcone from '@/components/InfoIcone.vue'
-import { ciclo as nomeDoCiclo, data, hoje } from '@/formato'
+import { ciclo as nomeDoCiclo, data, hoje, somarCiclos } from '@/formato'
 
 const ciclos = ref<Ciclo[]>([])
 const atual = ref<string>('')
 const editando = ref<string | null>(null)
 const dataReal = ref('')
 const erro = ref('')
-
-function somarMeses(id: string, n: number): string {
-  const [a, m] = id.split('-').map(Number) as [number, number]
-  const total = a * 12 + (m - 1) + n
-  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
-}
 
 async function carregar() {
   erro.value = ''
@@ -25,7 +20,7 @@ async function carregar() {
     // 2 ciclos anteriores e o horizonte de projeção de 12 ciclos (RN-06).
     ciclos.value = await chamar<Ciclo[]>(
       'GET',
-      `/ciclos?de=${somarMeses(atual.value, -2)}&ate=${somarMeses(atual.value, 11)}`,
+      `/ciclos?de=${somarCiclos(atual.value, -2)}&ate=${somarCiclos(atual.value, 11)}`,
     )
   } catch {
     erro.value = 'Não foi possível carregar os ciclos.'
@@ -112,6 +107,7 @@ onMounted(carregar)
       </div>
       <p v-if="erro" class="erro" role="alert">{{ erro }}</p>
     </section>
+    <CategoriasRegras />
   </AppShell>
 </template>
 

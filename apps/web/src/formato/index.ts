@@ -1,4 +1,4 @@
-import type { Finalidade, TipoDeConta } from '@/api/tipos'
+import type { Finalidade, Natureza, TipoDeConta, TipoDeTransacao } from '@/api/tipos'
 
 /** Primeira vigência de conta cadastrada sem data (apps/api, DESDE_SEMPRE). */
 export const DESDE_SEMPRE = '2000-01-01'
@@ -40,4 +40,35 @@ export function desde(iso: string): string {
 /** Hoje no fuso de São Paulo, `AAAA-MM-DD`. */
 export function hoje(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+}
+
+export const TIPOS_DE_TRANSACAO: Record<TipoDeTransacao, string> = {
+  receita: 'Receita',
+  despesa: 'Despesa',
+  transferencia: 'Transferência',
+  pagamento_fatura: 'Pagamento de fatura',
+  receita_fora_das_contas: 'Receita fora das contas',
+}
+
+export const NATUREZAS: Record<Natureza, string> = {
+  intermitente: 'Intermitente',
+  parcelada: 'Parcelada',
+  pontual: 'Pontual',
+  flexivel: 'Flexível',
+}
+
+/** Valor da API (texto decimal, ex.: "-1146.00") → "-R$ 1.146,00". */
+export function reais(valor: string | null | undefined): string {
+  if (valor === null || valor === undefined) return '—'
+  const negativo = valor.startsWith('-')
+  const [inteiro = '0', dec = '00'] = valor.replace('-', '').split('.')
+  const milhar = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${negativo ? '-' : ''}R$ ${milhar},${dec.padEnd(2, '0')}`
+}
+
+/** Ciclo vizinho: `2026-11`, +1 → `2026-12`. */
+export function somarCiclos(id: string, n: number): string {
+  const [a, m] = id.split('-').map(Number) as [number, number]
+  const total = a * 12 + (m - 1) + n
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`
 }

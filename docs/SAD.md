@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Versão | **1.2** |
+| Versão | **1.3** |
 | Status | **Aprovado pelo Matheus em 14/11/2026** |
 | Dono | Chat de Arquitetura e Desenvolvimento (PRD §9.12). Os demais chats não editam este arquivo: registram propostas em `docs/propostas/` (§8) |
 | Base | PRD v1.1 (`docs/PRD.md`) e protótipos (`docs/prototipos/`) |
@@ -16,6 +16,7 @@
 | 1.0 | 14/11/2026 | Primeira versão: DT-04 a DT-22, contrato entre as frentes, sequência do MVP |
 | 1.1 | 14/11/2026 | Ajustes vindos do esqueleto (HU-01). Contrato (§6): Node 24.15 ou superior; scripts `typecheck` e `test`; arquivos que a imagem precisa conter. Decisões menores DM-04 a DM-07. DT-16 e DT-18: dono e permissão dos segredos (proposta do DevOps, aceita). Impacto: nenhum em HU, prazo ou métricas |
 | 1.2 | 15/11/2026 | Marco de 30/11 (v0.2.0). Contrato (§6): MCP em `/mcp` e comandos de token e de configuração inicial. DT-13: `listar_contas` antecipada. Decisões menores DM-09 a DM-17, incluindo a premissa da DM-12 (compra no dia do fechamento). Impacto: nenhum em HU, prazo ou métricas |
+| 1.3 | 15/11/2026 | Marco de 14/12 (v0.3.0): 10 das 11 ferramentas da DT-13 (falta só `consultar_projecao`, de 29/12); decisões menores DM-18 a DM-24; pendência PD-3 (criar categoria pelo MCP). Impacto: nenhum em HU, prazo ou métricas |
 
 ### Como ler
 
@@ -243,7 +244,7 @@ Limite: 500 itens por lote.
 | `listar_lotes` | Leitura | Lotes por ciclo, conta e status |
 | `consultar_transacoes` | Leitura | Busca com filtros e paginação |
 | `listar_pendencias` | Leitura | Sem categoria, possível duplicata, lote não conferido |
-| `consultar_projecao` | Leitura | 12 ciclos (entra em 29/12) |
+| `consultar_projecao` | Leitura | 12 ciclos (entra em 29/12; as demais ferramentas desta tabela estão na v0.3.0) |
 | `importar_lote` | Escrita | Lote no formato da DT-10; item pode trazer categoria |
 | `desfazer_lote` | Escrita | Desfaz o lote inteiro (HU-09) |
 | `resolver_pendencia` | Escrita | Categorizar; confirmar ou negar duplicata; aceitar ou descartar lote não conferido |
@@ -481,6 +482,7 @@ Carga de revisão (R3):
 | PV-3 | Uma chamada `importar_lote` com ~300 itens cabe numa resposta do Claude (DT-10) | 14/12 | Permitir enviar o lote em partes, com conferência no fechamento |
 | PD-1 | O repositório no GitHub está **público**, e o PRD traz dados pessoais (renda, reserva, empregador) | Decisão do Matheus | — |
 | PD-2 | Ajustes no PRD decorrentes deste SAD (§11) | Próxima versão do PRD | — |
+| PD-3 | A migração da planilha (HU-11) precisa das categorias dela. Hoje só a tela cria categorias; o Claude pode criar regras ao resolver pendências, mas não categorias. Proposta: ferramenta `criar_categoria` no MCP, registrada e reversível como as demais escritas | Antes da migração (depois da v0.3.0) | O Matheus cria as categorias pela tela antes da migração |
 
 ---
 
@@ -507,6 +509,13 @@ Escolhas pequenas e reversíveis, tomadas pelo chat e registradas aqui (DT-22).
 | DM-15 | 15/11/2026 | Hash do token do MCP com `crypt()` de custo 8 (a senha usa 12) | O segredo tem 256 bits sorteados, então o custo não muda a segurança; com custo 12, cada chamada do Claude gastaria cerca de 1 s de CPU no servidor |
 | DM-16 | 15/11/2026 | A auditoria cobre as tabelas de dados. As de acesso (`usuario`, `sessao`, `token_mcp`) ficam fora | Login e uso do token gerariam um registro por acesso, sem valor para o QA-06 |
 | DM-17 | 15/11/2026 | A data real do salário precisa estar a até 15 dias da esperada e não pode inverter a ordem dos ciclos | Evita erro de digitação que reorganizaria o histórico inteiro (RN-04) |
+| DM-18 | 15/11/2026 | Valor e datas de uma transação não mudam depois de gravados, nem pela tela: corrige-se desfazendo o lote ou excluindo e lançando de novo | Mesma regra do Claude (PRD §3.3), aplicada a todos: o documento é a fonte da verdade e o log fica simples |
+| DM-19 | 15/11/2026 | Lote rejeitado (soma não confere) não é gravado; o erro volta para quem enviou, com a diferença | HU-08 CA1 ("nada gravado"); o Claude relê e reenvia na mesma conversa |
+| DM-20 | 15/11/2026 | Lote de cartão leva a fatura do documento (fechamento e vencimento) e todas as compras, inclusive parcelas antigas, entram nela. Sem a fatura, cada item vai para a fatura calculada pela sua data | A parcela 3/4 de uma compra de agosto é paga na fatura de novembro; a data da compra não diz isso |
+| DM-21 | 15/11/2026 | Categoria enviada pelo Claude no item vale mais que a regra; sem categoria, vale a regra; sem regra, fica pendente | O Claude lê o documento inteiro; a regra cobre o que ele não classificou |
+| DM-22 | 15/11/2026 | Transferência e pagamento de fatura não pedem categoria nem aparecem como pendência "sem categoria" | Movem dinheiro entre contas próprias; categorizar contaria o gasto duas vezes |
+| DM-23 | 15/11/2026 | A entidade Parcelamento e as parcelas futuras ficam para a entrega da projeção (29/12); por ora a parcela (n/N) fica na própria transação | Só a projeção usa as parcelas futuras (RN-11); a migração precisa só das parcelas já pagas |
+| DM-24 | 15/11/2026 | Comandos `UPDATE`/`DELETE … RETURNING` passam pela função `alterar()` | O TypeORM devolve `[linhas, quantidade]` nesses comandos; o engano causou dois defeitos na 0.2.0, já corrigidos |
 
 ---
 

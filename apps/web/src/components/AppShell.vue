@@ -10,6 +10,7 @@ const router = useRouter()
 /** Itens do menu já disponíveis (DM-03); os demais entram com as próximas entregas. */
 const itens = [
   { nome: 'inicio', rotulo: 'Início' },
+  { nome: 'transacoes', rotulo: 'Transações' },
   { nome: 'contas', rotulo: 'Contas' },
   { nome: 'configuracoes', rotulo: 'Configurações' },
 ]
