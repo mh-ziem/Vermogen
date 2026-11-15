@@ -62,6 +62,7 @@ describe('MCP (DT-11 a DT-13)', () => {
       'listar_lotes',
       'consultar_transacoes',
       'listar_pendencias',
+      'consultar_projecao',
       'importar_lote',
       'desfazer_lote',
       'resolver_pendencia',

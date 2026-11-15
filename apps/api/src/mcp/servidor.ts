@@ -7,6 +7,7 @@ import { PendenciasService } from '../classificacao/pendencias.service.js';
 import { validar } from '../comum/erros.js';
 import { CONFIG, type Config } from '../config/config.js';
 import { ImportacaoService } from '../importacao/importacao.service.js';
+import { ProjecaoService } from '../projecao/projecao.service.js';
 import { NATUREZAS, filtro, lancamento, lote, novaCategoria, resolucao } from '../transacoes/esquemas.js';
 import { TransacoesService } from '../transacoes/transacoes.service.js';
 
@@ -41,6 +42,7 @@ export class ServidorMcp {
     @Inject(TransacoesService) private readonly transacoes: TransacoesService,
     @Inject(ImportacaoService) private readonly importacao: ImportacaoService,
     @Inject(PendenciasService) private readonly pendencias: PendenciasService,
+    @Inject(ProjecaoService) private readonly projecao: ProjecaoService,
   ) {}
 
   /** Um servidor por requisição: o transporte é sem estado (DT-12). */
@@ -170,6 +172,41 @@ export class ServidorMcp {
         annotations: leitura,
       },
       async () => resultado(await this.pendencias.listar()),
+    );
+
+    s.registerTool(
+      'consultar_projecao',
+      {
+        title: 'Consultar projeção',
+        description:
+          'Projeção dos próximos 12 ciclos (HU-15), a partir do ciclo atual. Por ciclo: receita (salário), dízimo, ' +
+          'faturas, fixas e intermitentes, aporte, resultado líquido (receita − dízimo − faturas − fixas − aporte) e ' +
+          'veredito (positivo ≥ folga mínima; moderado entre 0 e a folga; negativo < 0). Saídas vêm negativas. ' +
+          'Traz também o livre para gastar do ciclo atual e a data dos últimos dados importados. Use detalharCiclo ' +
+          '(AAAA-MM) para receber as faturas, as fixas e os itens de um ciclo. Se configurada for false, o salário ' +
+          'ainda não foi informado em Configurações.',
+        inputSchema: { detalharCiclo: z.string().optional().describe('Ciclo AAAA-MM para detalhar') },
+        annotations: leitura,
+      },
+      async ({ detalharCiclo }) => {
+        const p = await this.projecao.projecao();
+        return resultado({
+          ...p,
+          ciclos: p.ciclos.map((c) => ({
+            ciclo: c.ciclo.id,
+            inicio: c.ciclo.inicio,
+            fim: c.ciclo.fim,
+            receita: c.receita,
+            dizimo: c.dizimo,
+            faturas: c.totais.faturas,
+            fixas: c.totais.fixas,
+            aporte: c.aporte,
+            resultadoLiquido: c.resultadoLiquido,
+            veredito: c.veredito,
+          })),
+          detalhe: detalharCiclo ? (p.ciclos.find((c) => c.ciclo.id === detalharCiclo) ?? null) : undefined,
+        });
+      },
     );
 
     s.registerTool(

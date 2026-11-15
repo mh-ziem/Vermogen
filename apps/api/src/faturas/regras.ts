@@ -63,3 +63,22 @@ export function faturaDaCompra(dataCompra: Data, cartao: DiasDoCartao, reais?: D
   const vencimento = vencimentoDaFatura(fechamento, cartao);
   return { fechamento, vencimento, ciclo: cicloDaData(vencimento, reais) };
 }
+
+/** Fatura seguinte do mesmo cartão: o primeiro fechamento depois do fechamento dado. */
+export function faturaSeguinte(fechamento: Data, cartao: DiasDoCartao): { fechamento: Data; vencimento: Data } {
+  const proximo = fechamentoDaCompra(fechamento, cartao);
+  return { fechamento: proximo, vencimento: vencimentoDaFatura(proximo, cartao) };
+}
+
+/** Faturas do cartão com vencimento entre `de` e `ate`, inclusive (ex.: as pagas num ciclo). */
+export function faturasComVencimentoEntre(cartao: DiasDoCartao, de: Data, ate: Data): { fechamento: Data; vencimento: Data }[] {
+  // Começa dois meses antes: o vencimento fica até ~40 dias depois do fechamento.
+  const [ano, mes] = anoMes(de);
+  let atual = faturaSeguinte(criarData(...somarMeses(ano, mes, -2), 1), cartao);
+  const lista: { fechamento: Data; vencimento: Data }[] = [];
+  while (atual.vencimento <= ate) {
+    if (atual.vencimento >= de) lista.push(atual);
+    atual = faturaSeguinte(atual.fechamento, cartao);
+  }
+  return lista;
+}
