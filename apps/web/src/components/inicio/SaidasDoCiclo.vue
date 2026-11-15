@@ -43,7 +43,11 @@ const resto = computed(() => restoDasFaturas(props.ciclo))
           <td class="r num">{{ comoSaida(`${resto < 0 ? '-' : ''}${textoAbsoluto(resto)}`).texto }}</td>
         </tr>
         <tr v-for="(fx, n) in ciclo.fixas" :key="`fx${n}`" class="fixa">
-          <td class="desc">{{ fx.descricao }}<span class="st projetada">projetada</span></td>
+          <td class="desc">
+            {{ fx.descricao
+            }}<span v-if="fx.base === 'realizado'" class="st fechada">realizada</span
+            ><span v-else class="st projetada">projetada</span>
+          </td>
           <td class="dt"></td>
           <td class="r num" :class="{ pos: comoSaida(fx.valor).entra }">{{ comoSaida(fx.valor).texto }}</td>
         </tr>
