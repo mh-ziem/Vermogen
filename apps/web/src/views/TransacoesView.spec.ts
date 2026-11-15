@@ -45,6 +45,7 @@ const respostas: Record<string, unknown> = {
 
 function responder(url: string, init?: RequestInit) {
   if (init?.method === 'POST' && url === '/api/pendencias/resolver') return new Response(JSON.stringify({ ok: true }), { status: 200 })
+  if (init?.method === 'PATCH') return new Response(JSON.stringify(transacao('t1')), { status: 200 })
   const corpo = respostas[url]
   if (corpo === undefined) return new Response(JSON.stringify({ message: `sem resposta para ${url}` }), { status: 404 })
   return new Response(JSON.stringify(corpo), { status: 200 })
@@ -89,6 +90,33 @@ describe('tela de transações', () => {
     await flushPromises()
     const envio = fetchFalso.mock.calls.find(([u]) => String(u) === '/api/pendencias/resolver')
     expect(JSON.parse(String(envio?.[1]?.body))).toEqual({ tipo: 'categorizar', transacaoId: 't1', categoriaId: 'cat1', criarRegra: { padrao: 'padaria' } })
+  })
+
+  it('edição: envia só o que mudou, com o valor no formato da API', async () => {
+    const fetchFalso = vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, i) => responder(String(u), i))
+    const tela = await montar()
+    await tela.find('.linha').trigger('click')
+    expect(tela.text()).toContain('Veio de um lote')
+    const campos = tela.findAll('.edicao input')
+    expect((campos[2]!.element as HTMLInputElement).value).toBe('-47,90')
+    await campos[1]!.setValue('2026-10-29')
+    await campos[2]!.setValue('-50,00')
+    await tela.find('.edicao').trigger('submit')
+    await flushPromises()
+    const envio = fetchFalso.mock.calls.find(([, i]) => i?.method === 'PATCH')
+    expect(String(envio?.[0])).toBe('/api/transacoes/t1')
+    expect(JSON.parse(String(envio?.[1]?.body))).toEqual({ data: '2026-10-29', valor: '-50.00' })
+  })
+
+  it('edição: valor inválido não é enviado', async () => {
+    const fetchFalso = vi.spyOn(globalThis, 'fetch').mockImplementation(async (u, i) => responder(String(u), i))
+    const tela = await montar()
+    await tela.find('.linha').trigger('click')
+    await tela.findAll('.edicao input')[2]!.setValue('0')
+    await tela.find('.edicao').trigger('submit')
+    await flushPromises()
+    expect(fetchFalso.mock.calls.some(([, i]) => i?.method === 'PATCH')).toBe(false)
+    expect(tela.text()).toContain('Valor inválido')
   })
 
   it('lotes: desfazer pede confirmação antes de enviar', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ciclo, data, desde, reais, somarCiclos } from './index'
+import { ciclo, data, desde, paraCampo, reais, somarCiclos, valorDigitado } from './index'
 
 describe('formato', () => {
   it('datas no padrão brasileiro', () => {
@@ -23,6 +23,17 @@ describe('formato', () => {
     expect(reais('535.5')).toBe('R$ 535,50')
     expect(reais('1234567.89')).toBe('R$ 1.234.567,89')
     expect(reais(null)).toBe('—')
+  })
+
+  it('valor digitado com sinal, no formato brasileiro ou com ponto', () => {
+    expect(valorDigitado('-47,90')).toBe('-47.90')
+    expect(valorDigitado('1.146,00')).toBe('1146.00')
+    expect(valorDigitado('-R$ 1.146,5')).toBe('-1146.5')
+    expect(valorDigitado('-47.90')).toBe('-47.90')
+    expect(valorDigitado('0,00')).toBeNull()
+    expect(valorDigitado('12.345,678')).toBeNull()
+    expect(valorDigitado('abc')).toBeNull()
+    expect(paraCampo('-1146.00')).toBe('-1146,00')
   })
 
   it('ciclo vizinho atravessa o ano', () => {

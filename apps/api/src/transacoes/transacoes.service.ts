@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 import { alterar } from '../comum/banco.js';
 import { type Autor, Escrita } from '../auditoria/escrita.js';
@@ -332,16 +332,36 @@ export class TransacoesService {
   // ----- Edição, exclusão lógica e anotação (HU-14) ----------------------------------
 
   /**
-   * Muda descrição, categoria ou tipo. Valor e datas não mudam: o documento é a fonte da verdade;
-   * erro de leitura se corrige desfazendo o lote (PRD §3.3, SAD DM-18).
+   * Muda descrição, categoria, tipo, valor ou data da compra. Valor e data só pela tela, pelo
+   * Matheus (SAD DM-18, revisado em 15/11): o Claude corrige erro de leitura desfazendo o lote.
+   * Mudar a data recalcula o pagamento e a fatura (RN-08), exceto em item de lote de fatura
+   * de cartão, que continua na fatura do documento. A auditoria guarda o antes e o depois.
    */
   async editar(
     autor: Autor,
     id: string,
-    dados: { descricao?: string | null; categoriaId?: string | null; tipo?: TipoDeTransacao },
+    dados: {
+      descricao?: string | null;
+      categoriaId?: string | null;
+      tipo?: TipoDeTransacao;
+      data?: Data;
+      centavos?: number;
+    },
   ): Promise<Transacao> {
+    const mudaValorOuData = dados.data !== undefined || dados.centavos !== undefined;
+    if (mudaValorOuData && autor === 'claude') {
+      throw new ForbiddenException('Valor e data só mudam pela tela; erro de leitura se corrige desfazendo o lote');
+    }
+    const reais = mudaValorOuData ? await this.ciclos.datasReais() : null;
     await this.escrita.executar(autor, async (m) => {
-      const [atual] = await m.query(`SELECT tipo, deleted_at FROM transacao WHERE id = $1 FOR UPDATE`, [id]);
+      const [atual] = await m.query(
+        `SELECT t.tipo, t.deleted_at, t.conta_id, to_char(t.data_compra, 'YYYY-MM-DD') AS data_compra,
+                to_char(t.data_pagamento, 'YYYY-MM-DD') AS data_pagamento, t.fatura_id, t.valor,
+                t.descricao_original, t.parcela_numero, t.parcela_total, i.fatura_id AS fatura_do_lote
+           FROM transacao t LEFT JOIN importacao i ON i.id = t.importacao_id
+          WHERE t.id = $1 FOR UPDATE OF t`,
+        [id],
+      );
       if (!atual) throw new NotFoundException('Transação não encontrada');
       if (atual.deleted_at) throw new ConflictException('A transação está na lixeira; restaure antes de editar');
       const tipo: TipoDeTransacao = dados.tipo ?? atual.tipo;
@@ -350,13 +370,44 @@ export class TransacoesService {
       }
       if (dados.categoriaId) await this.classificacao.exigirCategoriaAtiva(m, dados.categoriaId);
       const limparCategoria = TIPOS_SEM_CATEGORIA.includes(tipo);
+
+      const data: Data = dados.data ?? atual.data_compra;
+      const centavos = dados.centavos ?? centavosDoBanco(atual.valor)!;
+      if (tipo === 'receita_fora_das_contas' && centavos <= 0) {
+        throw new BadRequestException('Receita fora das contas é sempre positiva');
+      }
+      let pagamento = { dataPagamento: atual.data_pagamento as Data, faturaId: atual.fatura_id as string | null };
+      if (data !== atual.data_compra && !atual.fatura_do_lote) {
+        pagamento = await this.resolverPagamento(m, atual.conta_id, data, reais!);
+      }
+      const chave = chaveDeDuplicata(atual.conta_id, {
+        data,
+        centavos,
+        descricao: atual.descricao_original,
+        parcela: atual.parcela_numero ? { numero: atual.parcela_numero, total: atual.parcela_total } : undefined,
+      });
+
       await m.query(
         `UPDATE transacao SET
            descricao = CASE WHEN $2 THEN $3 ELSE descricao END,
            categoria_id = CASE WHEN $7 THEN NULL WHEN $4 THEN $5 ELSE categoria_id END,
-           tipo = $6, atualizado_em = now()
+           tipo = $6, data_compra = $8, data_pagamento = $9, fatura_id = $10, valor = $11,
+           chave_duplicata = $12, atualizado_em = now()
          WHERE id = $1`,
-        [id, dados.descricao !== undefined, dados.descricao ?? null, dados.categoriaId !== undefined, dados.categoriaId ?? null, tipo, limparCategoria],
+        [
+          id,
+          dados.descricao !== undefined,
+          dados.descricao ?? null,
+          dados.categoriaId !== undefined,
+          dados.categoriaId ?? null,
+          tipo,
+          limparCategoria,
+          data,
+          pagamento.dataPagamento,
+          pagamento.faturaId,
+          deCentavos(centavos),
+          chave,
+        ],
       );
     });
     return this.obter(id);

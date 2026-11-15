@@ -1,4 +1,6 @@
+import { ForbiddenException } from '@nestjs/common';
 import request from 'supertest';
+import { TransacoesService } from '../src/transacoes/transacoes.service.js';
 import { type Contexto, entrar, reiniciarDados, subirApp } from './apoio.js';
 
 describe('lançamento manual, classificação e auditoria (HU-10, HU-12 a HU-14)', () => {
@@ -139,10 +141,62 @@ describe('lançamento manual, classificação e auditoria (HU-10, HU-12 a HU-14)
       expect((await get('/api/transacoes')).body.total).toBe(1);
     });
 
-    it('valor e data não podem ser editados (PRD §3.3)', async () => {
-      const t = (await post('/api/transacoes', { contaId: corrente, data: '2026-11-10', descricao: 'Padaria', valor: -15 })).body;
-      await patch(`/api/transacoes/${t.id}`, { valor: -16 }).expect(400);
-      await patch(`/api/transacoes/${t.id}`, { data: '2026-11-11' }).expect(400);
+    describe('edição de valor e data pela tela (DM-18, revisado em 15/11)', () => {
+      it('valor e data mudam; a auditoria guarda o antes e o depois', async () => {
+        const t = (await post('/api/transacoes', { contaId: corrente, data: '2026-11-10', descricao: 'Padaria', valor: -15 })).body;
+        const e = (await patch(`/api/transacoes/${t.id}`, { valor: '-16.50', data: '2026-11-11' }).expect(200)).body;
+        expect(e).toMatchObject({ valor: '-16.50', dataCompra: '2026-11-11', dataPagamento: '2026-11-11' });
+        const [, upd] = await ctx.db.query(`SELECT autor, antes, depois FROM auditoria WHERE tabela = 'transacao' ORDER BY id`);
+        expect(upd).toMatchObject({ autor: 'matheus', antes: { valor: -15 }, depois: { valor: -16.5 } });
+      });
+
+      it('no cartão, mudar a data recalcula a fatura e o ciclo', async () => {
+        const t = (await post('/api/transacoes', { contaId: cartao, data: '2026-10-30', descricao: 'Tênis', valor: -900 })).body;
+        expect(t).toMatchObject({ dataPagamento: '2026-11-09', ciclo: '2026-11' });
+        const e = (await patch(`/api/transacoes/${t.id}`, { data: '2026-11-02' }).expect(200)).body;
+        expect(e).toMatchObject({ dataCompra: '2026-11-02', dataPagamento: '2026-12-07', ciclo: '2026-12' });
+      });
+
+      it('item de lote de fatura continua na fatura do documento', async () => {
+        const r = (
+          await post('/api/lotes', {
+            contaId: cartao,
+            documento: 'Fatura',
+            periodo: { de: '2026-10-01', ate: '2026-10-31' },
+            fatura: { fechamento: '2026-10-31', vencimento: '2026-11-09' },
+            totalDeclarado: -100,
+            itens: [{ data: '2026-10-02', descricao: 'Livro', valor: -100 }],
+          }).expect(201)
+        ).body;
+        const [t] = (await get(`/api/transacoes?loteId=${r.loteId}`)).body.transacoes;
+        const e = (await patch(`/api/transacoes/${t.id}`, { data: '2026-11-03' }).expect(200)).body;
+        expect(e).toMatchObject({ dataCompra: '2026-11-03', dataPagamento: '2026-11-09' });
+      });
+
+      it('a nova chave de duplicata vale para os lançamentos seguintes', async () => {
+        const t = (await post('/api/transacoes', { contaId: corrente, data: '2026-11-10', descricao: 'Dízimo', valor: -230 })).body;
+        await patch(`/api/transacoes/${t.id}`, { valor: -250 }).expect(200);
+        const igualAntiga = (await post('/api/transacoes', { contaId: corrente, data: '2026-11-10', descricao: 'Dízimo', valor: -230 })).body;
+        expect(igualAntiga.duplicata).toBeNull();
+        const igualNova = (await post('/api/transacoes', { contaId: corrente, data: '2026-11-10', descricao: 'Dízimo', valor: -250 })).body;
+        expect(igualNova.duplicata).toEqual({ de: t.id });
+      });
+
+      it('o Claude não muda valor nem data (PRD §3.3), mas pode mudar a categoria', async () => {
+        const t = (await post('/api/transacoes', { contaId: corrente, data: '2026-11-10', descricao: 'Padaria', valor: -15 })).body;
+        const servico = ctx.app.get(TransacoesService);
+        await expect(servico.editar('claude', t.id, { centavos: -1600 })).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(servico.editar('claude', t.id, { data: '2026-11-11' })).rejects.toBeInstanceOf(ForbiddenException);
+        expect(await servico.editar('claude', t.id, { categoriaId: mercado })).toMatchObject({ valor: '-15.00', categoria: { id: mercado } });
+      });
+
+      it('recusa valor zero, data inválida e receita fora das contas negativa', async () => {
+        const t = (await post('/api/transacoes', { contaId: corrente, data: '2026-11-10', descricao: 'Padaria', valor: -15 })).body;
+        await patch(`/api/transacoes/${t.id}`, { valor: 0 }).expect(400);
+        await patch(`/api/transacoes/${t.id}`, { data: '2026-02-30' }).expect(400);
+        const mae = (await post('/api/transacoes', { tipo: 'receita_fora_das_contas', data: '2026-11-10', descricao: 'Mãe', valor: 535 })).body;
+        await patch(`/api/transacoes/${mae.id}`, { valor: -535 }).expect(400);
+      });
     });
 
     it('a anotação fica criptografada no banco (pgcrypto)', async () => {

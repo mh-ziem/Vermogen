@@ -58,6 +58,7 @@ describe('MCP (DT-11 a DT-13)', () => {
       'ping',
       'listar_contas',
       'listar_categorias',
+      'criar_categoria',
       'listar_lotes',
       'consultar_transacoes',
       'listar_pendencias',
@@ -117,6 +118,23 @@ describe('MCP (DT-11 a DT-13)', () => {
 
     const desfazer = await mcp(chamada(5, 'tools/call', { name: 'desfazer_lote', arguments: { loteId: certo.body.result.structuredContent.loteId } })).expect(200);
     expect(desfazer.body.result.structuredContent.status).toBe('desfeito');
+  });
+
+  it('criar_categoria (PD-3): cria em dois níveis, com autor "claude"; nome repetido volta como erro', async () => {
+    const pai = await mcp(chamada(1, 'tools/call', { name: 'criar_categoria', arguments: { nome: 'Moradia', natureza: 'intermitente' } })).expect(200);
+    const moradia = pai.body.result.structuredContent.categoria;
+    expect(moradia).toMatchObject({ nome: 'Moradia', paiId: null, natureza: 'intermitente', ativa: true });
+    const sub = await mcp(chamada(2, 'tools/call', { name: 'criar_categoria', arguments: { nome: 'Aluguel', paiId: moradia.id } })).expect(200);
+    expect(sub.body.result.structuredContent.categoria).toMatchObject({ nome: 'Aluguel', paiId: moradia.id });
+
+    const repetida = await mcp(chamada(3, 'tools/call', { name: 'criar_categoria', arguments: { nome: 'moradia' } })).expect(200);
+    expect(repetida.body.result.isError).toBe(true);
+    expect(repetida.body.result.content[0].text).toMatch(/Já existe uma categoria/);
+    const neta = await mcp(chamada(4, 'tools/call', { name: 'criar_categoria', arguments: { nome: 'Luz', paiId: sub.body.result.structuredContent.categoria.id } })).expect(200);
+    expect(neta.body.result.isError).toBe(true);
+
+    const autores = await ctx.db.query(`SELECT DISTINCT autor FROM auditoria WHERE tabela = 'categoria'`);
+    expect(autores).toEqual([{ autor: 'claude' }]);
   });
 
   it('o MCP não tem ferramenta para alterar valor ou data', async () => {

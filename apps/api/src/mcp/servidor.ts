@@ -7,7 +7,7 @@ import { PendenciasService } from '../classificacao/pendencias.service.js';
 import { validar } from '../comum/erros.js';
 import { CONFIG, type Config } from '../config/config.js';
 import { ImportacaoService } from '../importacao/importacao.service.js';
-import { filtro, lancamento, lote, resolucao } from '../transacoes/esquemas.js';
+import { NATUREZAS, filtro, lancamento, lote, novaCategoria, resolucao } from '../transacoes/esquemas.js';
 import { TransacoesService } from '../transacoes/transacoes.service.js';
 
 function resultado(dados: object) {
@@ -93,6 +93,27 @@ export class ServidorMcp {
           categorias: await this.classificacao.listarCategorias(false),
           regras: (await this.classificacao.listarRegras()).filter((r) => r.ativa),
         }),
+    );
+
+    s.registerTool(
+      'criar_categoria',
+      {
+        title: 'Criar categoria',
+        description:
+          'Cria uma categoria (SAD PD-3). A árvore tem dois níveis: sem paiId, categoria de primeiro nível; com paiId ' +
+          '(id de uma categoria de primeiro nível), subcategoria. O nome é único em cada nível (sem diferenciar ' +
+          'maiúsculas): consulte listar_categorias antes para não repetir. natureza é opcional: intermitente, ' +
+          'parcelada, pontual ou flexivel. Fica registrado como feito pelo Claude; o Matheus desativa pela tela se preciso.',
+        inputSchema: {
+          nome: z.string().describe('Até 60 caracteres'),
+          paiId: z.string().optional().describe('id da categoria de primeiro nível'),
+          natureza: z.enum(NATUREZAS).optional(),
+        },
+      },
+      async (args) => {
+        const limpo = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        return resultado({ categoria: await this.classificacao.criarCategoria(CLAUDE, validar(novaCategoria, limpo)) });
+      },
     );
 
     s.registerTool(

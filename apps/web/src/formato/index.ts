@@ -66,6 +66,24 @@ export function reais(valor: string | null | undefined): string {
   return `${negativo ? '-' : ''}R$ ${milhar},${dec.padEnd(2, '0')}`
 }
 
+/** Valor da API para o campo de edição: "-1146.00" → "-1146,00". */
+export function paraCampo(valor: string): string {
+  return valor.replace('.', ',')
+}
+
+/**
+ * Valor digitado com sinal ("-47,90", "1.146,00", "-47.90") → texto da API ("-47.90").
+ * Devolve null se não for um valor diferente de zero com até 2 casas.
+ */
+export function valorDigitado(texto: string): string | null {
+  const t = texto.trim().replace(/\s|R\$/g, '')
+  const negativo = t.startsWith('-')
+  const semSinal = t.replace(/^[-+]/, '')
+  const decimal = /,\d{1,2}$/.test(semSinal) ? semSinal.replace(/\./g, '').replace(',', '.') : semSinal.replace(/,/g, '')
+  if (!/^\d+(\.\d{1,2})?$/.test(decimal) || Number(decimal) === 0) return null
+  return `${negativo ? '-' : ''}${decimal}`
+}
+
 /** Ciclo vizinho: `2026-11`, +1 → `2026-12`. */
 export function somarCiclos(id: string, n: number): string {
   const [a, m] = id.split('-').map(Number) as [number, number]

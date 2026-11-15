@@ -7,7 +7,7 @@ import AppShell from '@/components/AppShell.vue'
 import FormLancamento from '@/components/FormLancamento.vue'
 import InfoIcone from '@/components/InfoIcone.vue'
 import SeletorCategoria from '@/components/SeletorCategoria.vue'
-import { ciclo as nomeDoCiclo, data, reais, somarCiclos, TIPOS_DE_TRANSACAO } from '@/formato'
+import { ciclo as nomeDoCiclo, data, paraCampo, reais, somarCiclos, TIPOS_DE_TRANSACAO, valorDigitado } from '@/formato'
 
 type Aba = 'transacoes' | 'pendencias' | 'lotes'
 const route = useRoute()
@@ -91,6 +91,39 @@ async function categorizar(t: Transacao, categoriaId: string) {
     await carregar()
   } catch (e) {
     falha(e)
+  }
+}
+
+/** Edição da transação aberta: descrição, data da compra e valor (DM-18, revisado em 15/11). */
+const edicao = ref<{ descricao: string; data: string; valor: string } | null>(null)
+
+function abrir(t: Transacao) {
+  aberta.value = aberta.value === t.id ? null : t.id
+  edicao.value = aberta.value ? { descricao: t.descricao, data: t.dataCompra, valor: paraCampo(t.valor) } : null
+  confirmar.value = null
+}
+
+async function salvarEdicao(t: Transacao) {
+  const e = edicao.value
+  if (!e) return
+  const valor = valorDigitado(e.valor)
+  if (!valor) {
+    erro.value = 'Valor inválido: use o sinal para saída, ex.: -47,90'
+    return
+  }
+  const corpo: Record<string, string> = {}
+  if (e.descricao.trim() && e.descricao.trim() !== t.descricao) corpo.descricao = e.descricao.trim()
+  if (e.data !== t.dataCompra) corpo.data = e.data
+  if (Number(valor) !== Number(t.valor)) corpo.valor = valor
+  if (Object.keys(corpo).length === 0) return
+  try {
+    erro.value = ''
+    await chamar('PATCH', `/transacoes/${t.id}`, corpo)
+    aberta.value = null
+    edicao.value = null
+    await carregar()
+  } catch (err) {
+    falha(err)
   }
 }
 
@@ -188,7 +221,7 @@ onMounted(iniciar)
       <p v-if="transacoes.length === 0" class="vazio">Nenhuma transação neste ciclo.</p>
       <ul class="lista">
         <li v-for="t in transacoes" :key="t.id" :style="{ '--bk': t.conta?.cor ?? 'var(--restrict)' }">
-          <button class="linha" :aria-expanded="aberta === t.id" @click="aberta = aberta === t.id ? null : t.id">
+          <button class="linha" :aria-expanded="aberta === t.id" @click="abrir(t)">
             <span class="dt num">{{ data(t.dataCompra, true) }}</span>
             <span class="desc">
               <b>{{ t.descricao }}</b>
@@ -222,6 +255,19 @@ onMounted(iniciar)
             <button class="btn" :class="{ perigo: confirmar === `excluir:${t.id}` }" @click="excluir(t)">
               {{ confirmar === `excluir:${t.id}` ? 'Confirmar: mover para a lixeira' : 'Excluir' }}
             </button>
+            <form v-if="edicao" class="edicao" @submit.prevent="salvarEdicao(t)">
+              <label class="campo descricao">Descrição<input v-model="edicao.descricao" maxlength="300" /></label>
+              <label class="campo">Data da compra<input v-model="edicao.data" type="date" required /></label>
+              <label class="campo valor">
+                <span><InfoIcone texto="Com sinal: negativo sai da conta, positivo entra. Ex.: -47,90." />Valor (R$)</span>
+                <input v-model="edicao.valor" inputmode="decimal" required />
+              </label>
+              <button class="btn primario">Salvar</button>
+              <p v-if="t.loteId" class="aviso">
+                Veio de um lote: mudar o valor faz a soma deixar de bater com o total do documento. Se foi erro de leitura do
+                documento inteiro, prefira desfazer o lote.
+              </p>
+            </form>
           </div>
         </li>
       </ul>
@@ -454,6 +500,26 @@ onMounted(iniciar)
   color: var(--muted);
   padding-bottom: 10px;
   flex: 1;
+}
+.edicao {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--faint);
+}
+.edicao .descricao {
+  flex: 1 1 200px;
+}
+.edicao .valor input {
+  width: 120px;
+}
+.aviso {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--pending);
 }
 .btn.perigo {
   background: rgba(255, 107, 91, 0.18);

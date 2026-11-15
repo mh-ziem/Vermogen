@@ -68,9 +68,12 @@ export const edicao = z
     descricao: descricao.nullable().optional(),
     categoriaId: z.uuid().nullable().optional(),
     tipo: z.enum(TIPOS_DE_ITEM).optional(),
+    data: data.optional(),
+    valor: valorNaoZero.optional(),
   })
   .strict()
-  .refine((o) => Object.keys(o).length > 0, 'nada para alterar');
+  .refine((o) => Object.keys(o).length > 0, 'nada para alterar')
+  .transform(({ valor: centavos, ...resto }) => ({ ...resto, ...(centavos === undefined ? {} : { centavos }) }));
 
 const simNao = z.enum(['true', 'false']).transform((v) => v === 'true');
 export const filtro = z
