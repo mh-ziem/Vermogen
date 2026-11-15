@@ -47,6 +47,18 @@ jobs:
             exit 1
           fi
 
+      # SAD DM-08: a versão da tag precisa ser igual ao "version" de apps/api/package.json,
+      # que é a versão que o /api/health devolve.
+      - name: Conferir a versão da tag com apps/api/package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pacote="$(node -p "require('./apps/api/package.json').version")"
+          if [ "$tag" != "$pacote" ]; then
+            echo "::error title=Versão diferente::A tag $GITHUB_REF_NAME pede a versão $tag, mas apps/api/package.json está com $pacote. Ajuste o version no main e crie a tag de novo."
+            exit 1
+          fi
+          echo "Versão conferida: $tag"
+
       - name: Definir tags da imagem
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
