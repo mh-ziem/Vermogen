@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de cenários · Desktop · Protótipo</title>
+<style>
+  :root{
+    --canvas:#000814; --card:#001533; --elev:#00204D; --recess:#010D1E;
+    --text:rgba(255,255,255,.92); --muted:rgba(255,255,255,.56); --faint:rgba(255,255,255,.09);
+    --in:#00CC4B; --out:#FF6B5B; --accent:#1C6CFF; --pending:#FECE4C; --restrict:#9B7BFF; --info:#5BA8FF;
+    --r:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--canvas);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .shell{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+  aside{background:var(--recess);border-right:1px solid var(--faint);padding:22px 14px;display:flex;flex-direction:column;gap:4px}
+  .brand{font-weight:700;font-size:15px;padding:4px 10px 22px;display:flex;align-items:center;gap:10px}
+  .brand i{width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,var(--accent),#00B8D9)}
+  aside a{color:var(--muted);text-decoration:none;font-size:14px;padding:10px 12px;border-radius:10px}
+  aside a:hover{background:var(--card);color:var(--text)}
+  aside a.on{background:var(--card);color:var(--accent)}
+  aside .sp{flex:1}
+  aside .proto{font-size:10px;color:var(--pending);letter-spacing:.06em;text-transform:uppercase;padding:10px 12px;opacity:.8}
+  main{padding:0 32px 40px;min-width:0}
+
+  .topbar{position:sticky;top:0;z-index:5;background:rgba(0,8,20,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    display:flex;align-items:center;gap:20px;padding:16px 0;border-bottom:1px solid var(--faint);margin-bottom:24px}
+  .cycle{display:flex;align-items:baseline;gap:12px;white-space:nowrap}
+  .cycle b{font-size:20px;font-weight:650}
+  .cycle span{font-size:13px;color:var(--muted)}
+  .cprog{width:80px;height:4px;border-radius:0;background:var(--faint);overflow:hidden;align-self:center}
+  .cprog i{display:block;height:100%;width:13%;background:var(--accent)}
+  .alerts{margin-left:auto;display:flex;align-items:center;gap:14px;min-width:0}
+  .ticker{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:999px;padding:8px 14px;width:420px;max-width:42vw;overflow:hidden}
+  .ticker .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .ticker .msg{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .35s,transform .35s}
+  .ticker .msg.out{opacity:0;transform:translateY(6px)}
+  .ticker .idx{margin-left:auto;font-size:11px;color:var(--muted);flex:none}
+  .ibtn{position:relative;width:34px;height:34px;border-radius:10px;background:var(--card);display:grid;place-items:center;cursor:pointer;border:0;color:var(--muted)}
+  .ibtn:hover{background:var(--elev);color:var(--text)}
+  .ibtn svg{width:17px;height:17px}
+  .badge{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;font-size:10px;font-weight:700;display:grid;place-items:center;color:#001533}
+
+  .grid{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start}
+  .card{background:var(--card);border-radius:var(--r);padding:20px}
+  .card h2{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.02em;display:flex;align-items:center;margin-bottom:16px}
+  .card h2 .grow{flex:1}
+  .col{display:flex;flex-direction:column;gap:16px;min-width:0}
+
+  /* Formulário */
+  .f{margin-bottom:16px}
+  .f label{display:block;font-size:12px;color:var(--muted);margin-bottom:7px}
+  .seg{display:flex;background:var(--recess);border-radius:12px;padding:3px;gap:2px}
+  .seg button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px;padding:8px 6px;border-radius:9px;cursor:pointer;white-space:nowrap}
+  .seg button.on{background:var(--elev);color:var(--text)}
+  .seg button:disabled{opacity:.3;cursor:not-allowed}
+  .inp{width:100%;background:var(--recess);border:1px solid var(--faint);border-radius:12px;color:var(--text);font:inherit;font-size:14px;padding:11px 12px;outline:none}
+  .inp:focus{border-color:var(--accent)}
+  .money{display:flex;align-items:center;background:var(--recess);border:1px solid var(--faint);border-radius:12px;padding:0 12px}
+  .money:focus-within{border-color:var(--accent)}
+  .money span{color:var(--muted);font-size:20px;font-weight:600}
+  .money input{flex:1;background:transparent;border:0;outline:none;color:var(--text);font:inherit;font-size:28px;font-weight:700;padding:10px 8px;font-variant-numeric:tabular-nums;width:100%}
+  select.inp{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,rgba(255,255,255,.5) 50%),linear-gradient(135deg,rgba(255,255,255,.5) 50%,transparent 50%);
+    background-position:calc(100% - 18px) 50%,calc(100% - 13px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stepper{display:flex;align-items:center;background:var(--recess);border:1px solid var(--faint);border-radius:12px}
+  .stepper button{width:40px;height:42px;border:0;background:transparent;color:var(--text);font-size:18px;cursor:pointer}
+  .stepper input{flex:1;width:40px;text-align:center;background:transparent;border:0;color:var(--text);font:inherit;font-size:15px;font-weight:600;outline:none}
+  .hint{font-size:11px;color:var(--muted);margin-top:6px}
+  .actions{display:flex;gap:10px;margin-top:6px}
+  .btn{flex:1;border:0;border-radius:12px;padding:12px;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+  .btn.pri{background:var(--accent);color:#fff}
+  .btn.sec{background:var(--elev);color:var(--text)}
+  .btn:disabled{opacity:.35;cursor:not-allowed}
+
+  /* Resultado */
+  .kpis{display:grid;grid-template-columns:1.25fr 1fr 1fr 1fr;gap:16px}
+  .kpi .lbl{font-size:12px;color:var(--muted);letter-spacing:.02em;display:flex;align-items:center}
+  .kpi .val{font-size:clamp(18px,1.7vw,26px);font-weight:700;margin:10px 0 8px;line-height:1.05;white-space:nowrap}
+  .kpi .val small{font-size:14px;color:var(--muted);font-weight:600;margin-right:3px}
+  .kpi .sub{font-size:12px;color:var(--muted)}
+  .verdict{display:flex;align-items:center;gap:10px;margin:10px 0 6px}
+  .verdict .big{font-size:26px;font-weight:750}
+  .vdot{width:12px;height:12px;border-radius:50%;flex:none;box-shadow:0 0 0 5px rgba(255,255,255,.05)}
+  .ok{color:var(--in)} .warn{color:var(--pending)} .bad{color:var(--out)}
+  .chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px}
+  .chip.ok{background:rgba(0,204,75,.13)} .chip.warn{background:rgba(254,206,76,.13)} .chip.bad{background:rgba(255,107,91,.14)}
+  .chip.neutral{background:var(--elev);color:var(--muted)}
+
+  .lg{display:inline-flex;align-items:center;gap:6px;font-weight:500;margin-left:16px}
+  .lg i{display:inline-block;width:10px;height:10px;border-radius:0}
+  .lg i.ghost{border:1.5px dashed rgba(255,255,255,.45)}
+  .lg i.line{width:16px;height:0;border-top:1.5px dashed var(--pending);border-radius:0}
+  .chartwrap{position:relative;height:260px}
+  .chartwrap svg{width:100%;height:100%;display:block}
+  .tt{position:absolute;pointer-events:none;background:var(--elev);border:1px solid var(--faint);border-radius:12px;padding:10px 12px;font-size:12px;min-width:180px;opacity:0;transition:opacity .15s;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+  .tt .h{font-weight:650;font-size:13px;margin-bottom:6px}
+  .tt .r{display:flex;justify-content:space-between;gap:16px;color:var(--muted);margin-top:3px}
+  .tt .r b{color:var(--text);font-weight:600}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{font-size:11px;font-weight:600;color:var(--muted);text-align:left;padding:0 0 10px;letter-spacing:.03em;text-transform:uppercase}
+  th.r,td.r{text-align:right}
+  td{padding:10px 0;border-top:1px solid var(--faint)}
+  tr.sel td{color:var(--text);font-weight:600}
+  tr.opt{cursor:pointer} tr.opt:hover td{color:var(--text)}
+  td{color:var(--muted)}
+
+  /* Ícone de informação (à esquerda do título) */
+  .info{position:relative;display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;
+    border:1px solid rgba(255,255,255,.28);color:rgba(255,255,255,.5);font-size:9px;font-weight:700;font-style:normal;
+    margin-right:7px;cursor:help;flex:none;letter-spacing:0;text-transform:none}
+  .info:hover{border-color:rgba(255,255,255,.6);color:var(--text)}
+  .info .tip{position:absolute;top:22px;left:-4px;z-index:20;width:260px;padding:10px 12px;border-radius:10px;
+    background:var(--elev);border:1px solid var(--faint);box-shadow:0 8px 24px rgba(0,0,0,.4);
+    font-size:12px;font-weight:400;line-height:1.45;color:var(--text);text-align:left;white-space:normal;
+    opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .15s 0s,transform .15s 0s,visibility 0s .15s}
+  .info:hover .tip{opacity:1;visibility:visible;transform:none;transition:opacity .15s 1.5s,transform .15s 1.5s,visibility 0s 1.5s}
+  .info.right .tip{left:auto;right:-10px}
+
+  /* ===== Celular (até 760 px) ===== */
+  @media (max-width:760px){
+    .shell{display:block}
+    .shell > aside{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:30;flex-direction:row;justify-content:space-around;gap:0;
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--faint);
+      background:rgba(1,13,30,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+    .shell > aside .brand, .shell > aside .sp, .shell > aside .proto, .shell > aside a:nth-of-type(n+6){display:none}
+    .shell > aside a{flex:1;flex-direction:column;justify-content:center;font-size:10.5px;line-height:1.2;padding:8px 2px;text-align:center;border-radius:8px;gap:3px}
+    .shell > aside a{position:relative}
+    .shell > aside a .pend{position:absolute;top:3px;right:8px;margin:0}
+    main{padding:0 16px 96px}
+    .topbar{flex-wrap:wrap;gap:10px;padding:12px 0;margin-bottom:16px}
+    .cycle{flex-wrap:wrap;gap:4px 10px}
+    .cycle b{font-size:18px}
+    .cprog{display:none}
+    .alerts{margin-left:0;width:100%;gap:8px}
+    .ticker{flex:1;width:auto;max-width:none}
+    .card{padding:16px}
+    .info .tip{position:fixed;left:16px;right:16px;top:auto;bottom:92px;width:auto;z-index:50}
+    .info.show .tip{opacity:1;visibility:visible;transform:none;transition:none}
+  }
+
+  @media (max-width:760px){
+    .grid{grid-template-columns:1fr;gap:10px}
+    .col{gap:10px}
+    .kpis{grid-template-columns:1fr 1fr;gap:10px}
+    .verdict .big{font-size:22px}
+    .card h2{flex-wrap:wrap;gap:8px 14px}
+    .lg{margin-left:0}
+    .chartwrap{overflow-x:auto;height:270px}
+    .chartwrap svg{height:250px}
+    th:nth-child(2), td:nth-child(2){display:none}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside>
+    <div class="brand"><i></i>Finanças</div>
+    <a href="01_inicio_desktop.html">Início</a>
+    <a href="03_abertura_ciclo_desktop.html">Abertura do ciclo</a>
+    <a href="#">Projeção</a>
+    <a href="#" class="on">Simulador de cenários</a>
+    <a href="#">Transações</a>
+    <a href="#">Contas</a>
+    <a href="#">Metas</a>
+    <div class="sp"></div>
+    <a href="#">Configurações</a>
+    <div class="proto">Protótipo · dados fictícios</div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div class="cycle"><b>Simulador de cenários</b><span class="num">Ciclo Novembro · dia 4/31</span></div>
+      <div class="cprog"><i></i></div>
+      <div class="alerts">
+        <div class="ticker"><span class="dot" id="tdot"></span><span class="msg" id="tmsg"></span><span class="idx num" id="tidx"></span></div>
+        <button class="ibtn" title="Pendências" data-filter="warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>
+          <span class="badge" style="background:var(--pending)" id="bwarn"></span></button>
+        <button class="ibtn" title="Avisos" data-filter="info">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5v.01"/></svg>
+          <span class="badge" style="background:var(--info)" id="binfo"></span></button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Simulação -->
+      <section class="card">
+        <h2><span data-info="Calculadora de cenários: preencha a compra, assinatura ou entrada que quer avaliar. Nada é gravado; o resultado ao lado é recalculado a cada alteração.">Simulação</span></h2>
+
+        <div class="f"><label>Tipo</label>
+          <div class="seg" id="dir"><button class="on" data-v="saida">Saída</button><button data-v="entrada">Entrada</button></div></div>
+
+        <div class="f"><label>Descrição</label><input class="inp" id="desc" value="Tênis"></div>
+
+        <div class="f"><label>Valor total</label>
+          <div class="money"><span>R$</span><input id="val" inputmode="decimal" value="900"></div></div>
+
+        <div class="f"><label>Forma</label>
+          <div class="seg" id="forma">
+            <button data-v="avista">À vista</button>
+            <button class="on" data-v="parcelado">Parcelado</button>
+            <button data-v="rec">Recorrente</button>
+          </div></div>
+
+        <div class="f two">
+          <div id="nbox"><label id="nlbl">Parcelas</label>
+            <div class="stepper"><button data-d="-1">−</button><input id="n" value="3" inputmode="numeric"><button data-d="1">+</button></div></div>
+          <div id="fimbox"><label>Fim</label>
+            <div class="seg" id="fim"><button class="on" data-v="sem">Sem fim</button><button data-v="com">Com fim</button></div></div>
+        </div>
+
+        <div class="f"><label>Pagar com</label>
+          <select class="inp" id="conta">
+            <option value="nu">Nubank · cartão</option>
+            <option value="in">Inter · cartão</option>
+            <option value="mp">Mercado Pago · cartão</option>
+            <option value="cc">Inter · conta corrente (débito/Pix)</option>
+            <option value="fp">Flash · Premiação (só à vista)</option>
+          </select>
+          <div class="hint num" id="chint"></div>
+        </div>
+
+        <div class="f"><label>Categoria</label>
+          <select class="inp"><option>Compras/Varejo</option><option>Academia/Saúde</option><option>Lazer/Viagem</option><option>Assinaturas</option><option>Educação</option></select></div>
+
+        <div class="actions">
+          <button class="btn sec" id="limpar">Limpar simulação</button>
+        </div>
+      </section>
+
+      <div class="col">
+        <!-- KPIs -->
+        <section class="kpis">
+          <div class="card kpi">
+            <div class="lbl"><span data-info="Positivo: todos os ciclos afetados mantêm o líquido projetado acima da folga mínima (R$ 300). Moderado: fica positivo, mas abaixo da folga. Negativo: algum ciclo fica negativo, o que comprometeria o aporte ou a reserva.">Veredito</span></div>
+            <div class="verdict"><span class="vdot" id="vdot"></span><span class="big" id="vtxt"></span></div>
+            <div class="sub num" id="vsub"></div>
+          </div>
+          <div class="card kpi">
+            <div class="lbl"><span data-info="Primeiro ciclo em que o compromisso pesa no caixa. No cartão, depende do fechamento da fatura: compra feita depois do fechamento só é paga na fatura seguinte.">1º ciclo afetado</span></div>
+            <div class="val" id="k1"></div><div class="sub num" id="k1s"></div>
+          </div>
+          <div class="card kpi">
+            <div class="lbl"><span data-info="O menor resultado líquido entre os ciclos afetados, já com a simulação. É o ponto mais apertado.">Menor líquido</span></div>
+            <div class="val num" id="k2"></div><div class="sub num" id="k2s"></div>
+          </div>
+          <div class="card kpi">
+            <div class="lbl"><span data-info="Valor total do compromisso. Para recorrências sem fim, mostra o custo em 12 ciclos." data-align="right" id="k3l">Custo total</span></div>
+            <div class="val num" id="k3"></div><div class="sub num" id="k3s"></div>
+          </div>
+        </section>
+
+        <!-- Gráfico -->
+        <section class="card">
+          <h2><span data-info="Líquido projetado (barra sólida): resultado líquido de cada ciclo já com a simulação. Despesa projetada (tracejado): quanto a simulação tira do ciclo; somada à barra, mostra o líquido que haveria sem ela. Cor da barra: verde acima da folga mínima, amarelo entre zero e a folga, vermelho negativo. Ciclos não afetados ficam apagados.">Impacto por ciclo</span>
+            <span class="lg"><i style="background:var(--in)"></i>Líquido projetado</span>
+            <span class="lg"><i class="ghost"></i><span id="lgdesp">Despesa projetada</span></span>
+            <span class="lg"><i class="line"></i>Folga mínima</span>
+          </h2>
+          <div class="chartwrap" id="cw"><svg id="chart"></svg><div class="tt" id="tt"></div></div>
+        </section>
+
+        <!-- Comparação de formas -->
+        <section class="card" id="cmpcard">
+          <h2><span data-info="A mesma compra em outras formas de pagamento, para comparar. Clique numa linha para aplicá-la à simulação.">Comparar formas</span></h2>
+          <table>
+            <thead><tr><th>Forma</th><th class="r">Parcela</th><th class="r">Menor líquido</th><th class="r">Veredito</th></tr></thead>
+            <tbody id="cmp"></tbody>
+          </table>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const fmt = v => (v<0?'−':'') + 'R$ ' + Math.abs(Math.round(v)).toLocaleString('pt-BR');
+
+/* Ícone "i" à esquerda do título */
+document.querySelectorAll('[data-info]').forEach(el => {
+  const i = document.createElement('i');
+  i.className = 'info' + (el.dataset.align === 'right' ? ' right' : '');
+  i.textContent = 'i';
+  const tip = document.createElement('span'); tip.className = 'tip'; tip.textContent = el.dataset.info;
+  i.appendChild(tip); el.before(i);
+});
+
+/* Barra de atenção (igual ao início) */
+const msgs = [
+  {t:'warn', m:'2 transações sem categoria'},
+  {t:'warn', m:'Possível duplicata · Inter · 28/10 · R$ 47,90'},
+  {t:'info', m:'Fatura Nubank fechou em 01/11 · aguardando importação'},
+  {t:'warn', m:'Saída acima de R$ 800 sem planejamento · 27/10'},
+];
+const tc = {warn:'var(--pending)', info:'var(--info)'};
+document.getElementById('bwarn').textContent = msgs.filter(x=>x.t==='warn').length;
+document.getElementById('binfo').textContent = msgs.filter(x=>x.t==='info').length;
+let ti = 0; const tmsg = document.getElementById('tmsg');
+function tick(){ tmsg.classList.add('out'); setTimeout(()=>{ const m = msgs[ti%msgs.length];
+  tmsg.textContent = m.m; document.getElementById('tdot').style.background = tc[m.t];
+  document.getElementById('tidx').textContent = (ti%msgs.length+1)+'/'+msgs.length; tmsg.classList.remove('out'); }, 200); }
+tick(); setInterval(()=>{ ti++; tick(); }, 5000);
+
+/* Base: resultado líquido projetado sem o compromisso */
+const base = [
+  {m:'Nov', s:911}, {m:'Dez', s:1035}, {m:'Jan', s:1760}, {m:'Fev', s:1880},
+  {m:'Mar', s:1810}, {m:'Abr', s:2110}, {m:'Mai', s:2110}, {m:'Jun', s:1950},
+  {m:'Jul', s:2110}, {m:'Ago', s:2060}, {m:'Set', s:2110}, {m:'Out', s:1980},
+];
+const FOLGA = 300, PREMIACAO = 128;
+const contas = {
+  nu:{start:1, k:'Dez', s:'Fatura Nubank · vence 09/12', cartao:true},
+  in:{start:1, k:'Dez', s:'Fatura Inter · vence 07/12', cartao:true},
+  mp:{start:1, k:'Dez', s:'Fatura Mercado Pago · vence 04/12', cartao:true},
+  cc:{start:0, k:'Nov', s:'Débito em conta · ciclo atual'},
+  fp:{start:0, k:'Nov', s:'Saldo restrito · não afeta o resultado', restrito:true},
+};
+const hints = {
+  nu:'Fatura fechou 01/11 · compra hoje entra na de 01/12',
+  in:'Fatura fechou 31/10 · compra hoje entra na de 30/11',
+  mp:'Fatura fecha 29/11 · compra hoje entra na de 29/11',
+  cc:'Sai do caixa no ciclo atual',
+  fp:'Saldo Premiação disponível: R$ 128',
+};
+const st = {dir:'saida', forma:'parcelado', fim:'sem', n:3, conta:'nu'};
+const $ = id => document.getElementById(id);
+
+function impacts(o){
+  const c = contas[o.conta], V = o.val, sign = o.dir === 'saida' ? -1 : 1, arr = base.map(()=>0);
+  if (c.restrito) return arr;
+  const s = c.start;
+  if (o.forma === 'avista') arr[s] = V;
+  else if (o.forma === 'parcelado') for (let k=0;k<o.n && s+k<arr.length;k++) arr[s+k] = V/o.n;
+  else if (o.fim === 'sem') for (let k=s;k<arr.length;k++) arr[k] = V;
+  else for (let k=0;k<o.n && s+k<arr.length;k++) arr[s+k] = V;
+  return arr.map(x => x*sign);
+}
+function verdict(o, after, imp){
+  const c = contas[o.conta];
+  if (c.restrito) return o.val <= PREMIACAO ? 'ok' : 'bad';
+  if (o.dir === 'entrada') return 'ok';
+  const aff = after.filter((_,i)=>imp[i]!==0);
+  const min = aff.length ? Math.min(...aff) : Infinity;
+  return min < 0 ? 'bad' : (min < FOLGA ? 'warn' : 'ok');
+}
+const vlabel = {ok:'Positivo', warn:'Moderado', bad:'Negativo'};
+
+function run(){
+  const o = {...st, val: parseFloat(($('val').value||'0').replace(/\./g,'').replace(',','.')) || 0};
+  const c = contas[o.conta];
+  // regras de habilitação
+  document.querySelectorAll('#forma button').forEach(b => b.disabled = c.restrito && b.dataset.v !== 'avista');
+  if (c.restrito && st.forma !== 'avista'){ st.forma = 'avista'; o.forma = 'avista'; setSeg('forma','avista'); }
+  $('nbox').style.visibility = (o.forma==='parcelado' || (o.forma==='rec' && o.fim==='com')) ? 'visible' : 'hidden';
+  $('fimbox').style.visibility = o.forma==='rec' ? 'visible' : 'hidden';
+  $('nlbl').textContent = o.forma==='rec' ? 'Ciclos' : 'Parcelas';
+  $('chint').textContent = hints[o.conta];
+
+  const imp = impacts(o), after = base.map((b,i)=>b.s + imp[i]);
+  $('lgdesp').textContent = o.dir === 'entrada' ? 'Entrada projetada' : 'Despesa projetada';
+  if (!o.val){
+    $('vdot').style.background = 'var(--faint)'; $('vtxt').textContent = '—'; $('vtxt').className = 'big';
+    $('vsub').textContent = 'Informe um valor';
+    ['k1','k2','k3'].forEach(k => { $(k).textContent = '—'; $(k).className = 'val num'; });
+    ['k1s','k2s','k3s'].forEach(k => $(k).textContent = '');
+    $('cmpcard').style.display = 'none';
+    draw(after, imp); return;
+  }
+  const v = verdict(o, after, imp);
+  $('vdot').style.background = v==='ok'?'var(--in)':v==='warn'?'var(--pending)':'var(--out)';
+  $('vtxt').textContent = vlabel[v]; $('vtxt').className = 'big ' + v;
+  const affIdx = imp.map((x,i)=>x!==0?i:-1).filter(i=>i>=0);
+  $('vsub').textContent = c.restrito ? (o.val<=PREMIACAO ? 'Dentro do saldo Premiação' : 'Acima do saldo Premiação · R$ 128')
+                        : affIdx.length ? affIdx.length + (affIdx.length>1?' ciclos afetados':' ciclo afetado') : '—';
+  $('k1').textContent = c.k; $('k1s').textContent = c.s;
+  if (c.restrito){ $('k2').textContent = '—'; $('k2s').textContent = 'Saldo restrito'; }
+  else {
+    const minI = affIdx.reduce((a,i)=> after[i] < after[a] ? i : a, affIdx[0] ?? 0);
+    $('k2').textContent = fmt(after[minI]); $('k2').className = 'val num ' + (after[minI]<0?'bad':after[minI]<FOLGA?'warn':'');
+    $('k2s').textContent = base[minI].m + ' · era ' + fmt(base[minI].s);
+  }
+  if (o.forma==='rec' && o.fim==='sem'){ $('k3').textContent = fmt(o.val*12); $('k3s').textContent = fmt(o.val)+' por ciclo · 12 ciclos'; }
+  else if (o.forma==='rec'){ $('k3').textContent = fmt(o.val*o.n); $('k3s').textContent = fmt(o.val)+' × '+o.n+' ciclos'; }
+  else if (o.forma==='parcelado'){ $('k3').textContent = fmt(o.val); $('k3s').textContent = o.n+'× de '+fmt(o.val/o.n); }
+  else { $('k3').textContent = fmt(o.val); $('k3s').textContent = 'Pagamento único'; }
+
+  draw(after, imp);
+
+  // comparação de formas (só compras de saída à vista/parceladas)
+  const show = o.dir==='saida' && o.forma!=='rec' && !c.restrito;
+  $('cmpcard').style.display = show ? '' : 'none';
+  if (show){
+    $('cmp').innerHTML = [1,3,6,10].map(n => {
+      const oo = {...o, forma: n===1?'avista':'parcelado', n};
+      const ii = impacts(oo), aa = base.map((b,i)=>b.s+ii[i]), vv = verdict(oo, aa, ii);
+      const mn = Math.min(...aa.filter((_,i)=>ii[i]!==0));
+      const sel = (n===1 && o.forma==='avista') || (n===o.n && o.forma==='parcelado');
+      return `<tr class="opt ${sel?'sel':''}" data-n="${n}"><td>${n===1?'À vista':n+'×'}</td><td class="r num">${fmt(o.val/n)}</td>
+        <td class="r num">${fmt(mn)}</td><td class="r"><span class="chip ${vv}">${vlabel[vv]}</span></td></tr>`;
+    }).join('');
+    document.querySelectorAll('#cmp tr').forEach(tr => tr.addEventListener('click', ()=>{
+      const n = +tr.dataset.n; st.forma = n===1?'avista':'parcelado'; if(n>1){ st.n = n; $('n').value = n; }
+      setSeg('forma', st.forma); run();
+    }));
+  }
+}
+
+function draw(after, imp){
+  const svg = $('chart'), cw = $('cw'), tt = $('tt');
+  const W = Math.max(cw.clientWidth, matchMedia('(max-width:760px)').matches ? 620 : 0), H = svg.clientHeight || cw.clientHeight, L = 58, R = 12, T = 12, B = 28;
+  svg.style.width = W + 'px';
+  if (W < L + R + 40) { requestAnimationFrame(()=>draw(after, imp)); return; }
+  const vals = after.concat(base.map(b=>b.s));
+  const max = Math.max(2500, Math.ceil(Math.max(...vals)/1000)*1000), min = Math.min(0, Math.floor(Math.min(...vals)/1000)*1000);
+  const iw = W-L-R, ih = H-T-B, y = v => T + ih*(max-v)/(max-min), x = i => L + iw*(i+.5)/after.length, bw = Math.min(34, iw/after.length*.5);
+  let h = '';
+  for (let t=min; t<=max; t+=1000){
+    h += `<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="rgba(255,255,255,${t===0?.25:.07})"/>`;
+    h += `<text x="${L-10}" y="${y(t)+4}" text-anchor="end" font-size="11" fill="rgba(255,255,255,.45)">${t===0?'0':(t/1000)+' mil'}</text>`;
+  }
+  h += `<line x1="${L}" x2="${W-R}" y1="${y(FOLGA)}" y2="${y(FOLGA)}" stroke="var(--pending)" stroke-dasharray="5 5" opacity=".7"/>`;
+  after.forEach((a,i) => {
+    const b = base[i].s, aff = imp[i]!==0;
+    const col = a<0 ? 'var(--out)' : (aff && a<FOLGA ? 'var(--pending)' : 'var(--in)');
+    const top = Math.min(y(a), y(0)), hh = Math.abs(y(0)-y(a));
+    h += `<rect x="${x(i)-bw/2}" y="${top}" width="${bw}" height="${hh}" rx="0" fill="${col}" opacity="${aff?1:.35}"/>`;
+    if (aff) { const t1 = Math.min(y(a), y(b)), t2 = Math.max(y(a), y(b));
+      h += `<rect x="${x(i)-bw/2}" y="${t1}" width="${bw}" height="${t2-t1}" rx="0" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.5)" stroke-dasharray="4 3"/>`; }
+    const ly = a >= 0 ? y(aff ? Math.max(a, b) : a) - 6 : y(a) + 13;
+    h += `<text x="${x(i)}" y="${ly}" text-anchor="middle" font-size="10.5" font-weight="600" class="num"
+            fill="${a<0?'var(--out)':(aff?'rgba(255,255,255,.9)':'rgba(255,255,255,.4)')}">${(a<0?'−':'')+Math.abs(Math.round(a)).toLocaleString('pt-BR')}</text>`;
+    h += `<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="rgba(255,255,255,${aff?.85:.45})">${base[i].m}</text>`;
+    h += `<rect class="hit" data-i="${i}" x="${L+iw*i/after.length}" y="${T}" width="${iw/after.length}" height="${ih}" fill="transparent"/>`;
+  });
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = h;
+  svg.querySelectorAll('.hit').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      const i = +el.dataset.i;
+      tt.innerHTML = `<div class="h">Ciclo ${base[i].m}</div>
+        <div class="r">Líquido sem a simulação <b class="num">${fmt(base[i].s)}</b></div>
+        <div class="r">${imp[i]>=0?'Entrada':'Despesa'} projetada <b class="num">${fmt(imp[i])}</b></div>
+        <div class="r">Líquido projetado <b class="num">${fmt(after[i])}</b></div>`;
+      tt.style.left = Math.min(x(i)+14, W-200)+'px'; tt.style.top = '20px'; tt.style.opacity = 1;
+    });
+    el.addEventListener('mouseleave', () => tt.style.opacity = 0);
+  });
+}
+
+function setSeg(id, v){ document.querySelectorAll('#'+id+' button').forEach(b => b.classList.toggle('on', b.dataset.v===v)); }
+['dir','forma','fim'].forEach(id => document.querySelectorAll('#'+id+' button').forEach(b => b.addEventListener('click', ()=>{
+  if (b.disabled) return; st[id] = b.dataset.v; setSeg(id, b.dataset.v); run();
+})));
+document.querySelectorAll('.stepper button').forEach(b => b.addEventListener('click', ()=>{
+  st.n = Math.max(1, Math.min(24, st.n + (+b.dataset.d))); $('n').value = st.n; run();
+}));
+$('n').addEventListener('input', e => { st.n = Math.max(1, Math.min(24, parseInt(e.target.value)||1)); run(); });
+$('val').addEventListener('input', run);
+$('conta').addEventListener('change', e => { st.conta = e.target.value; run(); });
+$('limpar').addEventListener('click', () => {
+  Object.assign(st, {dir:'saida', forma:'avista', fim:'sem', n:1, conta:'nu'});
+  $('desc').value = ''; $('val').value = ''; $('n').value = 1; $('conta').value = 'nu';
+  ['dir','forma','fim'].forEach(id => setSeg(id, st[id])); run();
+});
+window.addEventListener('resize', run);
+run();
+
+/* Toque no "i" abre/fecha a descrição (celular não tem hover) */
+document.addEventListener('click', e => {
+  const i = e.target.closest('.info');
+  document.querySelectorAll('.info.show').forEach(x => { if (x !== i) x.classList.remove('show'); });
+  if (i && matchMedia('(max-width:760px)').matches){ i.classList.toggle('show'); e.stopPropagation(); }
+}, true);
+</script>
+</body>
+</html>
