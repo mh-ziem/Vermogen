@@ -5,6 +5,7 @@ import type { Ciclo } from '@/api/tipos'
 import AppShell from '@/components/AppShell.vue'
 import CategoriasRegras from '@/components/CategoriasRegras.vue'
 import InfoIcone from '@/components/InfoIcone.vue'
+import ParametrosProjecao from '@/components/ParametrosProjecao.vue'
 import { ciclo as nomeDoCiclo, data, hoje, somarCiclos } from '@/formato'
 
 const ciclos = ref<Ciclo[]>([])
@@ -107,6 +108,7 @@ onMounted(carregar)
       </div>
       <p v-if="erro" class="erro" role="alert">{{ erro }}</p>
     </section>
+    <ParametrosProjecao />
     <CategoriasRegras />
   </AppShell>
 </template>
