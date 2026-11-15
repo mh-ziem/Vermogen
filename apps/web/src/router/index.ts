@@ -6,6 +6,8 @@ const router = createRouter({
   routes: [
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { publica: true } },
     { path: '/', name: 'inicio', component: () => import('@/views/InicioView.vue') },
+    { path: '/contas', name: 'contas', component: () => import('@/views/ContasView.vue') },
+    { path: '/configuracoes', name: 'configuracoes', component: () => import('@/views/ConfiguracoesView.vue') },
     { path: '/:resto(.*)*', redirect: '/' },
   ],
 })
