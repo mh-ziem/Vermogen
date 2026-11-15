@@ -27,6 +27,8 @@
 **/*.crt
 
 # Documentação e implantação não entram na imagem
+# (exceção: o script que a etapa "deps" do Dockerfile usa)
 docs
-deploy
+deploy/*
+!deploy/podar-dependencias.mjs
 *.md

@@ -7,7 +7,7 @@
 #
 # Três etapas:
 #   build  instala tudo (inclusive dependências de desenvolvimento) e roda "npm run build"
-#   deps   instala só as dependências de produção
+#   deps   instala só as dependências de produção do apps/api
 #   final  junta dist/ e node_modules de produção, roda como uid 1000, sem segredos
 
 # Node 24 LTS com versão fixa. Manter igual ao "node-version" de .github/workflows/ci.yml.
@@ -34,7 +34,11 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
+# Com workspaces, "--omit=dev" ainda deixa ferramentas de desenvolvimento (peers opcionais
+# do apps/web) e as dependências do apps/web. O script remove tudo que o apps/api não usa.
+COPY deploy/podar-dependencias.mjs /tmp/podar-dependencias.mjs
 RUN npm ci --omit=dev --no-audit --no-fund \
+ && node /tmp/podar-dependencias.mjs \
  && npm cache clean --force
 
 # ---------------------------------------------------------------------------
