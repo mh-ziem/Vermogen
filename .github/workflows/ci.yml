@@ -49,23 +49,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # GUARDA TEMPORÁRIA: sai no primeiro PR depois que o esqueleto do app (dev/esqueleto)
-      # estiver no main. Até lá, sem package.json os passos abaixo aparecem como "skipped".
-      - name: Conferir se o esqueleto do app já existe
-        id: esqueleto
-        run: |
-          if [ -f package.json ] && [ -f package-lock.json ]; then
-            echo "existe=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "existe=false" >> "$GITHUB_OUTPUT"
-            msg="Sem package.json/package-lock.json na raiz: npm ci, typecheck, testes e build foram PULADOS. Guarda temporária até o esqueleto do app entrar no main."
-            echo "::warning title=Esqueleto ausente::$msg"
-            echo "### Verificação pulada" >> "$GITHUB_STEP_SUMMARY"
-            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
       - name: Instalar o Node 24
-        if: steps.esqueleto.outputs.existe == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # Manter igual à imagem base de deploy/Dockerfile.
@@ -73,15 +57,12 @@ jobs:
           cache: npm
 
       - name: Instalar dependências (npm ci)
-        if: steps.esqueleto.outputs.existe == 'true'
         run: npm ci --no-audit --no-fund
 
       - name: Verificar tipos
-        if: steps.esqueleto.outputs.existe == 'true'
         run: npm run typecheck
 
       - name: Criar segredos de teste
-        if: steps.esqueleto.outputs.existe == 'true'
         run: |
           umask 077
           dir="$RUNNER_TEMP/segredos"
@@ -92,7 +73,6 @@ jobs:
           echo "SEGREDOS_DIR=$dir" >> "$GITHUB_ENV"
 
       - name: Testes
-        if: steps.esqueleto.outputs.existe == 'true'
         env:
           DB_HOST: localhost
           DB_PORT: "5432"
@@ -104,5 +84,4 @@ jobs:
         run: npm test
 
       - name: Build
-        if: steps.esqueleto.outputs.existe == 'true'
         run: npm run build
