@@ -5,6 +5,9 @@ import express, { type NextFunction, type Request, type Response } from 'express
 import { criarAuthMiddleware, ehRotaProtegida } from './auth/auth.middleware.js';
 import { AuthService } from './auth/auth.service.js';
 import { CONFIG, type Config } from './config/config.js';
+import { criarHandlerMcp } from './mcp/mcp.handler.js';
+import { ServidorMcp } from './mcp/servidor.js';
+import { TokensService } from './mcp/tokens.service.js';
 
 /**
  * Configuração comum ao app real (main.ts) e aos testes de integração:
@@ -28,7 +31,14 @@ export function configurarApp(app: NestExpressApplication): void {
     next();
   });
 
-  app.use(criarAuthMiddleware(app.get(AuthService)));
+  app.use(criarAuthMiddleware(app.get(AuthService), app.get(TokensService)));
+
+  // MCP (DT-12): fora do prefixo /api, com o próprio leitor de JSON (os do Nest entram depois).
+  // O leitor fica dentro de uma função com outro nome: o Nest deixa de registrar o leitor global
+  // se encontrar na pilha um middleware chamado "jsonParser".
+  const lerJson = express.json({ limit: '2mb' });
+  const lerJsonDoMcp = (req: Request, res: Response, next: NextFunction) => lerJson(req, res, next);
+  app.use('/mcp', lerJsonDoMcp, criarHandlerMcp(app.get(ServidorMcp)));
 
   // Arquivos estáticos do Vue (DT-01). Em desenvolvimento e nos testes a pasta pode não existir.
   const indice = join(config.webDist, 'index.html');

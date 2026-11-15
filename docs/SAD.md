@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Versão | **1.1** |
+| Versão | **1.4** |
 | Status | **Aprovado pelo Matheus em 14/11/2026** |
 | Dono | Chat de Arquitetura e Desenvolvimento (PRD §9.12). Os demais chats não editam este arquivo: registram propostas em `docs/propostas/` (§8) |
 | Base | PRD v1.1 (`docs/PRD.md`) e protótipos (`docs/prototipos/`) |
@@ -15,6 +15,9 @@
 |---|---|---|
 | 1.0 | 14/11/2026 | Primeira versão: DT-04 a DT-22, contrato entre as frentes, sequência do MVP |
 | 1.1 | 14/11/2026 | Ajustes vindos do esqueleto (HU-01). Contrato (§6): Node 24.15 ou superior; scripts `typecheck` e `test`; arquivos que a imagem precisa conter. Decisões menores DM-04 a DM-07. DT-16 e DT-18: dono e permissão dos segredos (proposta do DevOps, aceita). Impacto: nenhum em HU, prazo ou métricas |
+| 1.2 | 15/11/2026 | Marco de 30/11 (v0.2.0). Contrato (§6): MCP em `/mcp` e comandos de token e de configuração inicial. DT-13: `listar_contas` antecipada. Decisões menores DM-09 a DM-17, incluindo a premissa da DM-12 (compra no dia do fechamento). Impacto: nenhum em HU, prazo ou métricas |
+| 1.3 | 15/11/2026 | Marco de 14/12 (v0.3.0): 10 das 11 ferramentas da DT-13 (falta só `consultar_projecao`, de 29/12); decisões menores DM-18 a DM-24; pendência PD-3 (criar categoria pelo MCP). Impacto: nenhum em HU, prazo ou métricas |
+| 1.4 | 15/11/2026 | Decisões do Matheus em 15/11. PD-3 aceita: DT-13 ganha `criar_categoria`. DM-18 revista: o Matheus edita valor e data pela tela; o Claude continua sem poder. DM-12 confirmada. Impacto: nenhum em HU, prazo ou métricas |
 
 ### Como ler
 
@@ -237,12 +240,13 @@ Limite: 500 itens por lote.
 | Ferramenta | Tipo | Faz |
 |---|---|---|
 | `ping` | Leitura | Confirma conexão, token e versão (validação da DT-12) |
-| `listar_contas` | Leitura | Contas com instituição, tipo e finalidade vigente |
+| `listar_contas` | Leitura | Contas com instituição, tipo e finalidade vigente (antecipada para 30/11: os cadastros já existem) |
 | `listar_categorias` | Leitura | Árvore de categorias |
+| `criar_categoria` | Escrita | Categoria ou subcategoria, para a migração da planilha (PD-3, aceita em 15/11) |
 | `listar_lotes` | Leitura | Lotes por ciclo, conta e status |
 | `consultar_transacoes` | Leitura | Busca com filtros e paginação |
 | `listar_pendencias` | Leitura | Sem categoria, possível duplicata, lote não conferido |
-| `consultar_projecao` | Leitura | 12 ciclos (entra em 29/12) |
+| `consultar_projecao` | Leitura | 12 ciclos (entra em 29/12; as demais ferramentas desta tabela estão na v0.3.0) |
 | `importar_lote` | Escrita | Lote no formato da DT-10; item pode trazer categoria |
 | `desfazer_lote` | Escrita | Desfaz o lote inteiro (HU-09) |
 | `resolver_pendencia` | Escrita | Categorizar; confirmar ou negar duplicata; aceitar ou descartar lote não conferido |
@@ -252,7 +256,7 @@ Regras:
 
 1. Sem SQL livre (PRD §3.3).
 2. Toda escrita entra com autor `claude` e passa pela auditoria (DT-09).
-3. Não existe ferramenta para alterar valor ou data de transação: erro de leitura se corrige desfazendo o lote (PRD §3.3).
+3. Não existe ferramenta para alterar valor ou data de transação: erro de leitura se corrige desfazendo o lote (PRD §3.3). Pela tela, o Matheus pode (DM-18).
 4. Mensagens de erro dizem o que corrigir (ex.: a diferença entre a soma e o total).
 5. As demais escritas (regras, metas, compromissos, reserva) são da Fase 2.
 
@@ -373,8 +377,18 @@ Vale para Dev e DevOps. Só muda por proposta (§8).
 | Comando | Faz |
 |---|---|
 | `node apps/api/dist/cli.js definir-senha` | Cria ou troca a senha de login |
-| `node apps/api/dist/cli.js criar-token-mcp` | Cria um token do MCP e mostra uma vez |
-| `node apps/api/dist/cli.js revogar-token-mcp` | Revoga um token |
+| `node apps/api/dist/cli.js criar-token-mcp --nome <nome>` | Cria um token do MCP, válido por 6 meses. O token sai sozinho no stdout (uma linha começando com `vmg_`); as mensagens saem no stderr |
+| `node apps/api/dist/cli.js revogar-token-mcp <id>` | Revoga um token |
+| `node apps/api/dist/cli.js listar-tokens-mcp` | Lista id, situação, validade, último uso e nome |
+| `node apps/api/dist/cli.js cadastrar-configuracao-inicial` | Cadastra as 5 instituições e 9 contas do PRD §9.4; só roda com o cadastro vazio |
+
+**MCP** (a partir da 0.2.0)
+
+| Item | Valor |
+|---|---|
+| Endereço | `POST /mcp`, transporte Streamable HTTP, sem sessão; respostas em JSON. `GET` e `DELETE` → 405 |
+| Credencial | Só `Authorization: Bearer vmg_<id>_<segredo>`. Sem token válido: 401 com `WWW-Authenticate: Bearer realm="vermogen"`. O cookie da tela não vale no MCP, e o token não vale em `/api` |
+| Ferramentas | As da DT-13 já disponíveis na versão; `ping` devolve `{"status":"ok","versao":"X.Y.Z"}` |
 
 ---
 
@@ -470,6 +484,7 @@ Carga de revisão (R3):
 | PV-3 | Uma chamada `importar_lote` com ~300 itens cabe numa resposta do Claude (DT-10) | 14/12 | Permitir enviar o lote em partes, com conferência no fechamento |
 | PD-1 | O repositório no GitHub está **público**, e o PRD traz dados pessoais (renda, reserva, empregador) | Decisão do Matheus | — |
 | PD-2 | Ajustes no PRD decorrentes deste SAD (§11) | Próxima versão do PRD | — |
+| PD-3 | ~~Criar categoria pelo MCP para a migração da planilha~~ **Decidida em 15/11: aceita.** Ferramenta `criar_categoria` na DT-13, com autor `claude` na auditoria; o Matheus desativa pela tela | — | — |
 
 ---
 
@@ -487,6 +502,22 @@ Escolhas pequenas e reversíveis, tomadas pelo chat e registradas aqui (DT-22).
 | DM-06 | 14/11/2026 | A autenticação tem duas barreiras: uma antes do roteador (até rota inexistente responde 401) e uma em cada rota | HU-01 CA1; uma rota nova nasce protegida sem depender de alguém lembrar |
 | DM-07 | 14/11/2026 | Arquivos de migração nomeados pelo instante de criação (`<milissegundos>-<assunto>.ts`) | Exigência do TypeORM; é o que define a ordem de aplicação |
 | DM-08 | 14/11/2026 | A versão da tag (`vX.Y.Z`) precisa ser igual ao `version` de `apps/api/package.json`; o pipeline recusa a publicação se não for | O health mostra a versão do `package.json`; sem a conferência, a imagem `0.2.0` poderia dizer `0.1.0` |
+| DM-09 | 15/11/2026 | Feriados bancários calculados por regra (datas fixas + Páscoa para carnaval, Sexta-feira Santa e Corpus Christi; 31/12 sem expediente; Consciência Negra a partir de 2024). A tabela `feriado` da DT-08 só será criada se surgir exceção | Nenhum cadastro a manter todo ano; a regra é testada (QA-07) |
+| DM-10 | 15/11/2026 | MCP com a biblioteca oficial `@modelcontextprotocol/sdk` 1.32, e não com `@nestjs/mcp` | O pacote do Nest está na versão 0.0.4, publicado há poucos dias |
+| DM-11 | 15/11/2026 | Acesso ao banco por SQL explícito e parametrizado; o TypeORM fica só com a conexão e as migrações, sem entidades | As regras usam funções do PostgreSQL (pgcrypto, intervalos, restrições de vigência) que o SQL mostra direto na revisão |
+| DM-12 | 15/11/2026 | Compra feita no próprio dia do fechamento entra na fatura seguinte (**confirmada pelo Matheus em 15/11**) | É a prática comum dos cartões ("melhor dia de compra"). Se algum banco fizer diferente, vira configuração do cartão |
+| DM-13 | 15/11/2026 | A primeira finalidade de uma conta cadastrada sem data vale para todo o histórico (guardada como 2000-01-01, exibida como "desde o início") | A migração da planilha traz transações desde jul/2025, e todas precisam de finalidade (RN-14) |
+| DM-14 | 15/11/2026 | A tabela `ciclo` guarda só os ciclos com data real do salário; os demais são calculados. A tabela `fatura` fica para a entrega das transações (14/12) | Uma tabela só é criada na entrega que a usa (DT-08); o ciclo calculado não precisa de linha |
+| DM-15 | 15/11/2026 | Hash do token do MCP com `crypt()` de custo 8 (a senha usa 12) | O segredo tem 256 bits sorteados, então o custo não muda a segurança; com custo 12, cada chamada do Claude gastaria cerca de 1 s de CPU no servidor |
+| DM-16 | 15/11/2026 | A auditoria cobre as tabelas de dados. As de acesso (`usuario`, `sessao`, `token_mcp`) ficam fora | Login e uso do token gerariam um registro por acesso, sem valor para o QA-06 |
+| DM-17 | 15/11/2026 | A data real do salário precisa estar a até 15 dias da esperada e não pode inverter a ordem dos ciclos | Evita erro de digitação que reorganizaria o histórico inteiro (RN-04) |
+| DM-18 | 15/11/2026 | **Revista em 15/11 pelo Matheus.** Pela tela, o Matheus edita valor e data da compra de qualquer transação; a auditoria guarda o antes e o depois. Mudar a data recalcula pagamento e fatura (RN-08), exceto em item de lote de fatura de cartão, que fica na fatura do documento (DM-20). O Claude continua sem poder (PRD §3.3); a API recusa com 403 se a escrita vier dele | Corrigir um lançamento manual digitado errado não deve exigir excluir e lançar de novo. Editar item de lote faz a soma deixar de bater com o documento; a tela avisa e sugere desfazer o lote |
+| DM-19 | 15/11/2026 | Lote rejeitado (soma não confere) não é gravado; o erro volta para quem enviou, com a diferença | HU-08 CA1 ("nada gravado"); o Claude relê e reenvia na mesma conversa |
+| DM-20 | 15/11/2026 | Lote de cartão leva a fatura do documento (fechamento e vencimento) e todas as compras, inclusive parcelas antigas, entram nela. Sem a fatura, cada item vai para a fatura calculada pela sua data | A parcela 3/4 de uma compra de agosto é paga na fatura de novembro; a data da compra não diz isso |
+| DM-21 | 15/11/2026 | Categoria enviada pelo Claude no item vale mais que a regra; sem categoria, vale a regra; sem regra, fica pendente | O Claude lê o documento inteiro; a regra cobre o que ele não classificou |
+| DM-22 | 15/11/2026 | Transferência e pagamento de fatura não pedem categoria nem aparecem como pendência "sem categoria" | Movem dinheiro entre contas próprias; categorizar contaria o gasto duas vezes |
+| DM-23 | 15/11/2026 | A entidade Parcelamento e as parcelas futuras ficam para a entrega da projeção (29/12); por ora a parcela (n/N) fica na própria transação | Só a projeção usa as parcelas futuras (RN-11); a migração precisa só das parcelas já pagas |
+| DM-24 | 15/11/2026 | Comandos `UPDATE`/`DELETE … RETURNING` passam pela função `alterar()` | O TypeORM devolve `[linhas, quantidade]` nesses comandos; o engano causou dois defeitos na 0.2.0, já corrigidos |
 
 ---
 
@@ -501,3 +532,4 @@ Entram numa próxima versão do PRD, pelo processo do §9.12. Nenhum altera HU, 
 | §9.8 | Pasta `Prototipos/` → `docs/prototipos/` |
 | §9.4, Importação | "hash do documento" → hash do conteúdo do lote, calculado pelo app (DT-10) |
 | §9.10, HU-01 CA1 | Registrar as três rotas públicas (DT-11) |
+| §9.2, RN-08 | Registrar a regra da DM-12 (confirmada em 15/11): compra no dia do fechamento entra na fatura seguinte |
