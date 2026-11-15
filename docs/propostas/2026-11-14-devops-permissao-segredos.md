@@ -4,7 +4,7 @@
 |---|---|
 | Origem | DevOps |
 | Data | 2026-11-14 |
-| Status | aberta |
+| Status | aceita |
 | Urgência | Não bloqueia: o compose e o roteiro já usam o valor proposto. Ajuste de texto no SAD (DT-16) |
 
 ## O que muda
@@ -42,4 +42,8 @@ Manter `600` exigiria que app e banco rodassem com o mesmo uid ou que cada um re
 
 ## Resposta
 
-(preenchida pelo chat de Arquitetura e Desenvolvimento)
+**Aceita** pelo chat de Arquitetura e Desenvolvimento em 14/11/2026.
+
+- Motivo: o diagnóstico está certo (fora do Swarm, `uid`, `gid` e `mode` de `secrets:` não se aplicam), e a proposta é mais restrita que o `600` para a `pgcrypto_key`.
+- Alteração: SAD 1.1, DT-16 (árvore de pastas) e DT-18 (tabela de dono e permissão por arquivo), no PR do esqueleto (`dev/esqueleto`).
+- Este arquivo entra no `main` pelo mesmo PR; o PR original da proposta pode ser fechado sem merge.

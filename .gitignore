@@ -1,3 +1,6 @@
-.git
 .env
-.env.exemple
+.env.*
+!.env.example
+!deploy/.env.servidor.example
+node_modules/
+dist/
