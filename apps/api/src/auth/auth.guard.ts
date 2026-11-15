@@ -17,6 +17,7 @@ export class AuthGuard implements CanActivate {
       contexto.getClass(),
     ]);
     if (publica) return true;
+    // Os handlers do Nest atendem só /api, onde a credencial é o cookie de sessão.
     if (contexto.switchToHttp().getRequest<Request>().sessao) return true;
     throw new UnauthorizedException('Não autenticado');
   }

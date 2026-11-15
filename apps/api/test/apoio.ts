@@ -22,7 +22,11 @@ export async function subirApp(): Promise<Contexto> {
 
 /** Deixa o banco com um único usuário e nenhuma sessão. */
 export async function reiniciarDados(db: DataSource): Promise<void> {
-  await db.query(`TRUNCATE sessao, usuario CASCADE`);
+  // TRUNCATE não dispara os gatilhos por linha, então limpa também a auditoria.
+  await db.query(
+    `TRUNCATE sessao, usuario, token_mcp, ciclo, snapshot_projecao, plano_ciclo, orcamento, parametro, transacao, importacao, fatura, regra_categorizacao, categoria,
+      conta_finalidade, conta, instituicao, auditoria RESTART IDENTITY CASCADE`,
+  );
   // Custo 4 só nos testes, para não gastar tempo no hash.
   await db.query(`INSERT INTO usuario (nome, senha_hash) VALUES ('matheus', crypt($1, gen_salt('bf', 4)))`, [
     SENHA,
@@ -34,4 +38,10 @@ export function cookieDe(resposta: { headers: Record<string, unknown> }): string
   const cookie = cabecalho?.[0]?.split(';')[0];
   if (!cookie) throw new Error('A resposta não trouxe cookie de sessão');
   return cookie;
+}
+
+/** Faz login e devolve o cookie da sessão. */
+export async function entrar(ctx: Contexto): Promise<string> {
+  const { default: request } = await import('supertest');
+  return cookieDe(await request(ctx.app.getHttpServer()).post('/api/auth/login').send({ senha: SENHA }).expect(200));
 }
