@@ -1,0 +1,108 @@
+# Verificação de todo PR e de todo push no main (SAD DT-15):
+# npm ci, verificação de tipos, testes (com PostgreSQL 17 de teste) e build.
+# Também é chamado pelo workflow "imagem.yml" antes de publicar uma versão.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verificar:
+    name: Tipos, testes e build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TZ: America/Sao_Paulo
+
+    services:
+      postgres:
+        # Mesma versão do deploy/compose.yml.
+        image: postgres:17.12-trixie
+        env:
+          POSTGRES_DB: vermogen
+          POSTGRES_USER: vermogen
+          # Banco descartável, só acessível dentro do job: aceita a conexão sem conferir senha,
+          # para não existir nenhuma senha escrita no repositório (QA-03).
+          POSTGRES_HOST_AUTH_METHOD: trust
+          TZ: America/Sao_Paulo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U vermogen -d vermogen"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # GUARDA TEMPORÁRIA: sai no primeiro PR depois que o esqueleto do app (dev/esqueleto)
+      # estiver no main. Até lá, sem package.json os passos abaixo aparecem como "skipped".
+      - name: Conferir se o esqueleto do app já existe
+        id: esqueleto
+        run: |
+          if [ -f package.json ] && [ -f package-lock.json ]; then
+            echo "existe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "existe=false" >> "$GITHUB_OUTPUT"
+            msg="Sem package.json/package-lock.json na raiz: npm ci, typecheck, testes e build foram PULADOS. Guarda temporária até o esqueleto do app entrar no main."
+            echo "::warning title=Esqueleto ausente::$msg"
+            echo "### Verificação pulada" >> "$GITHUB_STEP_SUMMARY"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Instalar o Node 24
+        if: steps.esqueleto.outputs.existe == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # Manter igual à imagem base de deploy/Dockerfile.
+          node-version: 24.22.3
+          cache: npm
+
+      - name: Instalar dependências (npm ci)
+        if: steps.esqueleto.outputs.existe == 'true'
+        run: npm ci --no-audit --no-fund
+
+      - name: Verificar tipos
+        if: steps.esqueleto.outputs.existe == 'true'
+        run: npm run typecheck
+
+      - name: Criar segredos de teste
+        if: steps.esqueleto.outputs.existe == 'true'
+        run: |
+          umask 077
+          dir="$RUNNER_TEMP/segredos"
+          mkdir -p "$dir"
+          # Valores aleatórios, gerados a cada execução e apagados com a máquina do job.
+          tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32 > "$dir/db_password"
+          tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 64 > "$dir/pgcrypto_key"
+          echo "SEGREDOS_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Testes
+        if: steps.esqueleto.outputs.existe == 'true'
+        env:
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          DB_NAME: vermogen
+          DB_USER: vermogen
+          DB_PASSWORD_FILE: ${{ env.SEGREDOS_DIR }}/db_password
+          PGCRYPTO_KEY_FILE: ${{ env.SEGREDOS_DIR }}/pgcrypto_key
+          LOG_LEVEL: warn
+        run: npm test
+
+      - name: Build
+        if: steps.esqueleto.outputs.existe == 'true'
+        run: npm run build
