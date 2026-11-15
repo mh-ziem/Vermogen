@@ -14,7 +14,7 @@
 | Versão | Data | Mudança |
 |---|---|---|
 | 1.0 | 14/11/2026 | Primeira versão: DT-04 a DT-22, contrato entre as frentes, sequência do MVP |
-| 1.1 | 14/11/2026 | Ajustes vindos do esqueleto (HU-01). Contrato (§6): Node 24.15 ou superior; scripts `typecheck` e `test`; arquivos que a imagem precisa conter. Decisões menores DM-04 a DM-07. Impacto: nenhum em HU, prazo ou métricas |
+| 1.1 | 14/11/2026 | Ajustes vindos do esqueleto (HU-01). Contrato (§6): Node 24.15 ou superior; scripts `typecheck` e `test`; arquivos que a imagem precisa conter. Decisões menores DM-04 a DM-07. DT-16 e DT-18: dono e permissão dos segredos (proposta do DevOps, aceita). Impacto: nenhum em HU, prazo ou métricas |
 
 ### Como ler
 
@@ -283,7 +283,7 @@ O pacote no GHCR é **privado**, mesmo que o repositório seja público. O servi
 /srv/vermogen/
 ├── compose.yml      cópia de deploy/compose.yml
 ├── .env             versão da imagem e porta (sem segredos)
-├── secrets/         db_password, pgcrypto_key (permissão 600)
+├── secrets/         pasta do root (0700); dono e permissão de cada arquivo na DT-18
 └── backups/         dumps feitos antes de migração
 ```
 
@@ -319,12 +319,14 @@ A porta é escolhida depois de consultar `/srv/REGISTRY.md`.
 
 **Decisão.** Dois segredos, como arquivos em `/srv/vermogen/secrets/`, montados pelo Compose em `/run/secrets/`:
 
-| Segredo | Uso |
-|---|---|
-| `db_password` | Senha do PostgreSQL |
-| `pgcrypto_key` | Chave do `pgp_sym_encrypt` |
+| Segredo | Uso | Dono (uid:gid) | Permissão | Quem lê |
+|---|---|---|---|---|
+| `db_password` | Senha do PostgreSQL | `999:1000` | `0440` | Banco (uid 999 na imagem oficial) e app (uid 1000) |
+| `pgcrypto_key` | Chave do `pgp_sym_encrypt` | `1000:1000` | `0400` | Só o app; o banco nem recebe o arquivo |
 
-Os arquivos são criados pelo Matheus no servidor, com comandos prontos. Não entram no repositório nem na imagem (QA-03). Senha de login e token do MCP não são segredos de arquivo: ficam no banco, como hash (DT-11).
+Fora do Swarm, o Compose monta o arquivo com o mesmo dono e a mesma permissão do servidor; por isso o dono é definido no próprio arquivo (proposta `2026-11-14-devops-permissao-segredos`, aceita).
+
+Os arquivos são criados pelo Matheus no servidor, com os comandos do roteiro `docs/operacao/primeira-implantacao.md` (passo 4). Não entram no repositório nem na imagem (QA-03). Senha de login e token do MCP não são segredos de arquivo: ficam no banco, como hash (DT-11).
 
 **Atenção:** perder a `pgcrypto_key` torna ilegíveis as anotações e justificativas. O roteiro de primeira implantação orienta guardar uma cópia fora do servidor.
 
@@ -484,6 +486,7 @@ Escolhas pequenas e reversíveis, tomadas pelo chat e registradas aqui (DT-22).
 | DM-05 | 14/11/2026 | O login pede só a senha; o usuário é fixo (`matheus`) | O app tem um único usuário (PRD §3.4). Senha com mínimo de 12 caracteres |
 | DM-06 | 14/11/2026 | A autenticação tem duas barreiras: uma antes do roteador (até rota inexistente responde 401) e uma em cada rota | HU-01 CA1; uma rota nova nasce protegida sem depender de alguém lembrar |
 | DM-07 | 14/11/2026 | Arquivos de migração nomeados pelo instante de criação (`<milissegundos>-<assunto>.ts`) | Exigência do TypeORM; é o que define a ordem de aplicação |
+| DM-08 | 14/11/2026 | A versão da tag (`vX.Y.Z`) precisa ser igual ao `version` de `apps/api/package.json`; o pipeline recusa a publicação se não for | O health mostra a versão do `package.json`; sem a conferência, a imagem `0.2.0` poderia dizer `0.1.0` |
 
 ---
 
