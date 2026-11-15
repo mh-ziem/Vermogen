@@ -54,7 +54,18 @@ describe('MCP (DT-11 a DT-13)', () => {
     expect(init.body.result.serverInfo).toMatchObject({ name: 'vermogen', version: expect.stringMatching(/^\d+\.\d+\.\d+$/) });
 
     const lista = await mcp(chamada(2, 'tools/list')).expect(200);
-    expect(lista.body.result.tools.map((t: { name: string }) => t.name)).toEqual(['ping', 'listar_contas']);
+    expect(lista.body.result.tools.map((t: { name: string }) => t.name)).toEqual([
+      'ping',
+      'listar_contas',
+      'listar_categorias',
+      'listar_lotes',
+      'consultar_transacoes',
+      'listar_pendencias',
+      'importar_lote',
+      'desfazer_lote',
+      'resolver_pendencia',
+      'registrar_lancamento',
+    ]);
 
     const ping = await mcp(chamada(3, 'tools/call', { name: 'ping', arguments: {} })).expect(200);
     expect(ping.body.result.structuredContent).toEqual({ status: 'ok', versao: expect.stringMatching(/^\d+\.\d+\.\d+$/) });
@@ -70,6 +81,48 @@ describe('MCP (DT-11 a DT-13)', () => {
       .expect(201);
     const r = await mcp(chamada(1, 'tools/call', { name: 'listar_contas', arguments: {} })).expect(200);
     expect(r.body.result.structuredContent.contas[0]).toMatchObject({ nome: 'Cartão', tipo: 'cartao', instituicao: { nome: 'Nubank' } });
+  });
+
+  it('importar_lote pelo Claude: grava com origem e autor "claude"; erro de soma volta como erro da ferramenta', async () => {
+    const cookie = await entrar(ctx);
+    const http = request(ctx.app.getHttpServer());
+    const inst = (await http.post('/api/instituicoes').set('Cookie', cookie).send({ nome: 'Inter', cor: '#FF9A3D' })).body;
+    const conta = (await request(ctx.app.getHttpServer()).post('/api/contas').set('Cookie', cookie).send({ instituicaoId: inst.id, nome: 'Conta', tipo: 'corrente', finalidade: 'gasto' })).body;
+    const lote = {
+      contaId: conta.id,
+      documento: 'Extrato Inter',
+      periodo: { de: '2026-10-01', ate: '2026-10-31' },
+      totalDeclarado: -59.9,
+      itens: [
+        { data: '2026-10-03', descricao: 'Padaria', valor: -12.5 },
+        { data: '2026-10-04', descricao: 'Farmácia', valor: '-47.40' },
+      ],
+    };
+    const errado = await mcp(chamada(1, 'tools/call', { name: 'importar_lote', arguments: { ...lote, totalDeclarado: -60 } })).expect(200);
+    expect(errado.body.result.isError).toBe(true);
+    expect(errado.body.result.content[0].text).toMatch(/Diferença: R\$ 0,10/);
+
+    const certo = await mcp(chamada(2, 'tools/call', { name: 'importar_lote', arguments: lote })).expect(200);
+    expect(certo.body.result.structuredContent).toMatchObject({ status: 'aceito', novas: 2 });
+    const autores = await ctx.db.query(`SELECT DISTINCT autor FROM auditoria WHERE tabela IN ('transacao', 'importacao')`);
+    expect(autores).toEqual([{ autor: 'claude' }]);
+    const [{ origem }] = await ctx.db.query(`SELECT DISTINCT origem FROM transacao`);
+    expect(origem).toBe('claude');
+
+    const pend = await mcp(chamada(3, 'tools/call', { name: 'listar_pendencias', arguments: {} })).expect(200);
+    expect(pend.body.result.structuredContent.semCategoria).toHaveLength(2);
+    const consulta = await mcp(chamada(4, 'tools/call', { name: 'consultar_transacoes', arguments: { ciclo: '2026-10', limite: 1 } })).expect(200);
+    expect(consulta.body.result.structuredContent).toMatchObject({ total: 2, soma: '-59.90' });
+    expect(consulta.body.result.structuredContent.transacoes).toHaveLength(1);
+
+    const desfazer = await mcp(chamada(5, 'tools/call', { name: 'desfazer_lote', arguments: { loteId: certo.body.result.structuredContent.loteId } })).expect(200);
+    expect(desfazer.body.result.structuredContent.status).toBe('desfeito');
+  });
+
+  it('o MCP não tem ferramenta para alterar valor ou data', async () => {
+    const lista = await mcp(chamada(1, 'tools/list')).expect(200);
+    const nomes: string[] = lista.body.result.tools.map((t: { name: string }) => t.name);
+    expect(nomes.some((n) => /alterar|editar|atualizar/.test(n))).toBe(false);
   });
 
   describe('sem token válido, 401', () => {

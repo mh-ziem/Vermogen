@@ -7,6 +7,7 @@ import { ConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { McpModule } from './mcp/mcp.module.js';
+import { TransacoesModule } from './transacoes/transacoes.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { McpModule } from './mcp/mcp.module.js';
     HealthModule,
     CalendarioModule,
     CadastrosModule,
+    TransacoesModule,
     McpModule,
   ],
 })

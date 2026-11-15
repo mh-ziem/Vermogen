@@ -24,7 +24,8 @@ export async function subirApp(): Promise<Contexto> {
 export async function reiniciarDados(db: DataSource): Promise<void> {
   // TRUNCATE não dispara os gatilhos por linha, então limpa também a auditoria.
   await db.query(
-    `TRUNCATE sessao, usuario, token_mcp, ciclo, conta_finalidade, conta, instituicao, auditoria RESTART IDENTITY CASCADE`,
+    `TRUNCATE sessao, usuario, token_mcp, ciclo, transacao, importacao, fatura, regra_categorizacao, categoria,
+      conta_finalidade, conta, instituicao, auditoria RESTART IDENTITY CASCADE`,
   );
   // Custo 4 só nos testes, para não gastar tempo no hash.
   await db.query(`INSERT INTO usuario (nome, senha_hash) VALUES ('matheus', crypt($1, gen_salt('bf', 4)))`, [
