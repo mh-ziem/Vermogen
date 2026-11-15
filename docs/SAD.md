@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Versão | **1.0** |
+| Versão | **1.1** |
 | Status | **Aprovado pelo Matheus em 14/11/2026** |
 | Dono | Chat de Arquitetura e Desenvolvimento (PRD §9.12). Os demais chats não editam este arquivo: registram propostas em `docs/propostas/` (§8) |
 | Base | PRD v1.1 (`docs/PRD.md`) e protótipos (`docs/prototipos/`) |
@@ -14,6 +14,7 @@
 | Versão | Data | Mudança |
 |---|---|---|
 | 1.0 | 14/11/2026 | Primeira versão: DT-04 a DT-22, contrato entre as frentes, sequência do MVP |
+| 1.1 | 14/11/2026 | Ajustes vindos do esqueleto (HU-01). Contrato (§6): Node 24.15 ou superior; scripts `typecheck` e `test`; arquivos que a imagem precisa conter. Decisões menores DM-04 a DM-07. Impacto: nenhum em HU, prazo ou métricas |
 
 ### Como ler
 
@@ -336,8 +337,10 @@ Vale para Dev e DevOps. Só muda por proposta (§8).
 | Item | Valor |
 |---|---|
 | Imagem | `ghcr.io/mh-ziem/vermogen`; tags `X.Y.Z` e `sha-<7>`; nunca `latest` |
-| Node | 24 LTS |
+| Node | 24 LTS, versão 24.15 ou superior (exigência das ferramentas de build do NestJS 12) |
 | Build | Na raiz: `npm ci` e `npm run build` |
+| Verificação | Na raiz: `npm run typecheck` e `npm test`. Os testes de integração usam um PostgreSQL 17 e leem as variáveis abaixo |
+| Conteúdo da imagem | `apps/api/dist/`, `apps/api/package.json` (declara o formato dos módulos e a versão), `apps/web/dist/` e as dependências de produção, na mesma árvore do repositório |
 | Início | `node apps/api/dist/main.js` |
 | Porta interna | `3000` |
 | Usuário | Não-root, uid 1000 |
@@ -477,6 +480,10 @@ Escolhas pequenas e reversíveis, tomadas pelo chat e registradas aqui (DT-22).
 | DM-01 | 14/11/2026 | Gráficos em SVG próprio, sem biblioteca de gráficos | Os protótipos já são assim, e a DS-02 (barras retas) fica sob controle total |
 | DM-02 | 14/11/2026 | Pasta dos protótipos em minúsculas: `docs/prototipos/` | Padrão dos demais caminhos |
 | DM-03 | 14/11/2026 | Menu conforme o protótipo: Início, Abertura do ciclo, Projeção, Simulador de cenários, Transações, Contas, Metas, Configurações. No MVP, os itens de Fase 2 não aparecem | PRD §9.8 |
+| DM-04 | 14/11/2026 | Módulos em formato ESM e testes com Vitest, na API e na tela | É o padrão do NestJS 12 e do Vue atuais; seguir o padrão reduz manutenção |
+| DM-05 | 14/11/2026 | O login pede só a senha; o usuário é fixo (`matheus`) | O app tem um único usuário (PRD §3.4). Senha com mínimo de 12 caracteres |
+| DM-06 | 14/11/2026 | A autenticação tem duas barreiras: uma antes do roteador (até rota inexistente responde 401) e uma em cada rota | HU-01 CA1; uma rota nova nasce protegida sem depender de alguém lembrar |
+| DM-07 | 14/11/2026 | Arquivos de migração nomeados pelo instante de criação (`<milissegundos>-<assunto>.ts`) | Exigência do TypeORM; é o que define a ordem de aplicação |
 
 ---
 
