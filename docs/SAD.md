@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Versão | **1.4** |
+| Versão | **1.5** |
 | Status | **Aprovado pelo Matheus em 14/11/2026** |
 | Dono | Chat de Arquitetura e Desenvolvimento (PRD §9.12). Os demais chats não editam este arquivo: registram propostas em `docs/propostas/` (§8) |
 | Base | PRD v1.1 (`docs/PRD.md`) e protótipos (`docs/prototipos/`) |
@@ -18,6 +18,7 @@
 | 1.2 | 15/11/2026 | Marco de 30/11 (v0.2.0). Contrato (§6): MCP em `/mcp` e comandos de token e de configuração inicial. DT-13: `listar_contas` antecipada. Decisões menores DM-09 a DM-17, incluindo a premissa da DM-12 (compra no dia do fechamento). Impacto: nenhum em HU, prazo ou métricas |
 | 1.3 | 15/11/2026 | Marco de 14/12 (v0.3.0): 10 das 11 ferramentas da DT-13 (falta só `consultar_projecao`, de 29/12); decisões menores DM-18 a DM-24; pendência PD-3 (criar categoria pelo MCP). Impacto: nenhum em HU, prazo ou métricas |
 | 1.4 | 15/11/2026 | Decisões do Matheus em 15/11. PD-3 aceita: DT-13 ganha `criar_categoria`. DM-18 revista: o Matheus edita valor e data pela tela; o Claude continua sem poder. DM-12 confirmada. Impacto: nenhum em HU, prazo ou métricas |
+| 1.5 | 15/11/2026 | Marco de 29/12 (v1.0.0): projeção, tela inicial, abertura e `consultar_projecao`. DT-08: `parametro` no lugar de `meta` (DM-26) e sem `parcelamento` no MVP (DM-25, revê a DM-23). Regras do cálculo nas DM-25 a DM-32. Impacto: nenhum em HU, prazo ou métricas |
 
 ### Como ler
 
@@ -160,12 +161,13 @@ Segue o modelo conceitual do PRD §9.4. Uma tabela só é criada na entrega que 
 | `ciclo` | Mês financeiro | Id `2026-11`, início, fim, data esperada e data real do salário (RN-04) |
 | `fatura` | Faturas de cartão | Fechamento, vencimento, valor, valor pago, status (modelo M3) |
 | `transacao` | Todo movimento | Data da compra, data do pagamento, valor, descrições, categoria, fatura, parcela, origem, lote, chave de duplicata, situação de duplicata, `deleted_at` |
-| `parcelamento` | A compra "mãe" | Valor total, N parcelas, data da compra |
+| ~~`parcelamento`~~ | A compra "mãe" | Fora do MVP: as parcelas futuras são calculadas das parcelas gravadas (DM-25) |
 | `importacao` | Lotes | Fonte, conta, período, total declarado, hash, contagens, status (modelo M2) |
 | `categoria` | Árvore de categorias | Categoria-pai, natureza |
 | `regra_categorizacao` | Classificação automática | Texto, conta, faixa de valor, prioridade → categoria |
-| `meta` | Aporte, reserva, limite, folga | Tipo, valor, vigência; mudar cria nova versão |
-| `orcamento` | Valor por categoria e ciclo | Vigência |
+| `parametro` | Salário, % do aporte, orçamento de flexíveis, folga mínima | Vigência por ciclo (DM-26). A `meta` (reserva, limite de R$ 800) fica para a Fase 2 |
+| `orcamento` | Valor fixo de uma categoria intermitente (RN-10) | Vigência por ciclo; vazio volta ao cálculo |
+| `plano_ciclo` | Aporte e orçamento de flexíveis ajustados na abertura | Um por ciclo (HU-17 CA4) |
 | `snapshot_projecao` | Projeção congelada | Detalhe em `jsonb`; data real do congelamento (M-03); marca "incompleto" |
 | `auditoria` | Toda alteração | DT-09 |
 
@@ -246,7 +248,7 @@ Limite: 500 itens por lote.
 | `listar_lotes` | Leitura | Lotes por ciclo, conta e status |
 | `consultar_transacoes` | Leitura | Busca com filtros e paginação |
 | `listar_pendencias` | Leitura | Sem categoria, possível duplicata, lote não conferido |
-| `consultar_projecao` | Leitura | 12 ciclos (entra em 29/12; as demais ferramentas desta tabela estão na v0.3.0) |
+| `consultar_projecao` | Leitura | Resumo dos 12 ciclos e detalhe de um ciclo (v1.0.0) |
 | `importar_lote` | Escrita | Lote no formato da DT-10; item pode trazer categoria |
 | `desfazer_lote` | Escrita | Desfaz o lote inteiro (HU-09) |
 | `resolver_pendencia` | Escrita | Categorizar; confirmar ou negar duplicata; aceitar ou descartar lote não conferido |
@@ -518,6 +520,14 @@ Escolhas pequenas e reversíveis, tomadas pelo chat e registradas aqui (DT-22).
 | DM-22 | 15/11/2026 | Transferência e pagamento de fatura não pedem categoria nem aparecem como pendência "sem categoria" | Movem dinheiro entre contas próprias; categorizar contaria o gasto duas vezes |
 | DM-23 | 15/11/2026 | A entidade Parcelamento e as parcelas futuras ficam para a entrega da projeção (29/12); por ora a parcela (n/N) fica na própria transação | Só a projeção usa as parcelas futuras (RN-11); a migração precisa só das parcelas já pagas |
 | DM-24 | 15/11/2026 | Comandos `UPDATE`/`DELETE … RETURNING` passam pela função `alterar()` | O TypeORM devolve `[linhas, quantidade]` nesses comandos; o engano causou dois defeitos na 0.2.0, já corrigidos |
+| DM-25 | 15/11/2026 | Sem tabela `parcelamento` no MVP (revê a DM-23). As parcelas futuras saem da última parcela gravada de cada compra, identificada por conta, número de parcelas, valor e descrição sem o "n/N"; no cartão, uma por fatura seguinte; fora dele, uma por mês | A visão pela data da compra (D1) não está em nenhuma tela do MVP; uma tabela só entra quando é usada (DT-08) |
+| DM-26 | 15/11/2026 | Parâmetros da projeção (salário, % do aporte, orçamento de flexíveis, folga mínima) na tabela `parametro`, com vigência por ciclo: mudar vale do ciclo atual em diante. Iniciais: aporte 10%, flexíveis R$ 1.420, folga R$ 300; o salário precisa ser informado em Configurações | Salário não é meta; reserva e limite de R$ 800 são da Fase 2. Vigência por ciclo cobre o dissídio sem reescrever o passado |
+| DM-27 | 15/11/2026 | Gasto flexível é toda despesa que não é de categoria intermitente nem parcela (inclui as sem categoria). Ele consome o Livre para gastar. O orçamento não gasto do ciclo anterior entra nas faturas do ciclo como estimativa e sai quando todas as faturas do ciclo fecharam | Postura conservadora (§5): o que não está classificado conta como gasto. É o "pago no próximo ciclo" do protótipo |
+| DM-28 | 15/11/2026 | Fatura paga no ciclo: se já fechou e tem transações, vale o valor real ("fechada"). Senão, o já gravado mais as parcelas futuras mais as fixas pagas naquele cartão ("projetada", ou "a importar" se já fechou sem documento) | E-04 e M-01: a fatura do Nubank fecha depois do salário; a projeção se ajusta sozinha quando o documento chega |
+| DM-29 | 15/11/2026 | Fixas e intermitentes (RN-10) contadas por categoria fora do cartão; as pagas no cartão entram na estimativa da fatura dele. A receita fora das contas que compensa outra (D3) abate da categoria compensada | A fatura projetada fica comparável à do banco e nada conta duas vezes. A faculdade entra pela metade que sai do bolso |
+| DM-30 | 15/11/2026 | Receita da projeção é só o salário configurado. Outras entradas (13º, ajuda) chegam com os compromissos (Fase 2). Gasto flexível feito no débito ou PIX aparece como redução do orçamento a pagar no ciclo seguinte, não no próprio ciclo | Fecha o CA2 da HU-15 sem antecipar a Fase 2. A diferença é só de data; o total do período é o mesmo |
+| DM-31 | 15/11/2026 | A abertura é sempre do ciclo atual. A etapa 1 espera um documento por conta ativa; no cartão, a fatura que vence no ciclo. Congelar de novo substitui a projeção congelada; a auditoria guarda a anterior | O procedimento atrasado (M-03) continua possível, e a data real do congelamento fica registrada |
+| DM-32 | 15/11/2026 | No celular, o menu tem Início, Abertura, Projeção, Transações e Ajustes; Contas fica só no desktop | DS-10 pede 5 itens na barra inferior; o cadastro de contas é raro |
 
 ---
 

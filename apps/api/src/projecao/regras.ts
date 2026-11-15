@@ -7,7 +7,7 @@ import { type DiasDoCartao, faturaSeguinte, faturasComVencimentoEntre } from '..
 /**
  * Projeção dos próximos ciclos (HU-15, RN-06, RN-07, RN-10, RN-11, RN-16). Função pura: recebe os
  * dados já lidos do banco e devolve a projeção, em centavos, com o sinal do dinheiro (positivo entra,
- * negativo sai). Regras do MVP registradas no SAD (DM-25 a DM-31).
+ * negativo sai). Regras do MVP registradas no SAD (DM-25 a DM-30).
  */
 
 export type Natureza = 'intermitente' | 'parcelada' | 'pontual' | 'flexivel';
