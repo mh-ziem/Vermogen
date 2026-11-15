@@ -1,0 +1,131 @@
+# Vermögen — stack do ziem-homeserver (SAD DT-16, DT-16b, DT-17, DT-18 e §6).
+#
+# No servidor este arquivo fica em /srv/vermogen/compose.yml, ao lado de:
+#   .env       versão da imagem, porta e endereço público (modelo: deploy/.env.servidor.example)
+#   secrets/   db_password e pgcrypto_key (dono e permissão: docs/operacao/primeira-implantacao.md)
+#
+# Segredos: o Compose (fora do Swarm) monta o arquivo do host como está, com o mesmo dono e
+# a mesma permissão. Por isso:
+#   db_password   dono 999 (postgres), grupo 1000 (app), modo 0440: os dois leem
+#   pgcrypto_key  dono 1000 (app), grupo 1000, modo 0400: só o app lê (o banco nem o recebe)
+#
+# Regras do servidor seguidas aqui: versão fixa de imagem, porta só em 127.0.0.1,
+# rede e volume próprios, limite de CPU e memória, restart com healthcheck, log com rotação.
+
+name: vermogen
+
+x-log: &log
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  vermogen-db:
+    # PostgreSQL 17 com versão menor fixa (DT-16). Variante Debian: usuário postgres = uid 999.
+    image: postgres:17.12-trixie
+    container_name: vermogen-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vermogen
+      POSTGRES_USER: vermogen
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      TZ: America/Sao_Paulo
+    secrets:
+      - db_password
+    volumes:
+      - vermogen_pgdata:/var/lib/postgresql/data
+    networks:
+      - vermogen_net
+    # Sem "ports": o banco não é publicado no host (QA-01). Só o app o alcança, pela rede vermogen_net.
+    healthcheck:
+      # -h 127.0.0.1: durante a primeira inicialização o servidor temporário só ouve no socket,
+      # então o banco só fica "healthy" quando o servidor definitivo está no ar.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "vermogen", "-d", "vermogen"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+      start_interval: 5s
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    # Dá tempo ao PostgreSQL de encerrar limpo (a imagem usa SIGINT, "fast shutdown").
+    stop_grace_period: 60s
+    logging: *log
+
+  vermogen-app:
+    # Versão vem do .env; nunca "latest" (DT-15).
+    image: "ghcr.io/mh-ziem/vermogen:${VERMOGEN_VERSION:?defina VERMOGEN_VERSION no .env, ex. 0.1.0}"
+    container_name: vermogen-app
+    restart: unless-stopped
+    init: true
+    environment:
+      PORT: "3000"
+      TZ: America/Sao_Paulo
+      DB_HOST: vermogen-db
+      DB_PORT: "5432"
+      DB_NAME: vermogen
+      DB_USER: vermogen
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      PGCRYPTO_KEY_FILE: /run/secrets/pgcrypto_key
+      PUBLIC_URL: "${VERMOGEN_PUBLIC_URL:?defina VERMOGEN_PUBLIC_URL no .env, ex. https://<nome>.<tailnet>.ts.net}"
+      LOG_LEVEL: "${VERMOGEN_LOG_LEVEL:-info}"
+    secrets:
+      - db_password
+      - pgcrypto_key
+    ports:
+      # Só 127.0.0.1 (QA-01). A tailnet chega por "tailscale serve" com HTTPS (DT-16b).
+      - "127.0.0.1:${VERMOGEN_PORT:?defina VERMOGEN_PORT no .env, depois de consultar /srv/REGISTRY.md}:3000"
+    networks:
+      - vermogen_net
+    depends_on:
+      # Ajuda no "docker compose up". Depois de um reboot quem religa é o Docker, sem ordem;
+      # por isso o app também espera o banco com novas tentativas (SAD §6).
+      vermogen-db:
+        condition: service_healthy
+    healthcheck:
+      # Sem curl/wget na imagem: usa o fetch do próprio Node. 200 = banco e migrações ok (SAD §6).
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.status===200?0:1),()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # Migrações rodam antes de abrir a porta (DT-17); a CPU do servidor é de 2012.
+      start_period: 180s
+      start_interval: 5s
+    # O app não guarda estado (SAD §6): sistema de arquivos só de leitura, exceto /tmp.
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    # O app encerra em até 10 s após SIGTERM (SAD §6); 15 s dá folga antes do SIGKILL.
+    stop_grace_period: 15s
+    logging: *log
+
+secrets:
+  db_password:
+    file: ./secrets/db_password
+  pgcrypto_key:
+    file: ./secrets/pgcrypto_key
+
+networks:
+  vermogen_net:
+    name: vermogen_net
+
+volumes:
+  vermogen_pgdata:
+    name: vermogen_pgdata
