@@ -91,6 +91,19 @@ O `ls` mostra no máximo 5 dumps, do mais antigo ao mais novo.
 | `não consegui baixar a versão ...` | Confira a tag no GitHub e o login no GHCR (`docker login ghcr.io`, passo 5 da primeira implantação) |
 | `o pg_dump falhou` | O app foi religado na versão anterior. Cole a saída no chat |
 
+### Só na 0.2.0 (opcional): cadastrar a configuração inicial
+
+A 0.2.0 traz um comando que cadastra as 9 contas da configuração inicial (PRD §9.4). Ele só age se o cadastro estiver vazio; se você já cadastrou alguma coisa pela tela, não faz nada.
+
+**No servidor:**
+
+```bash
+cd /srv/vermogen
+docker compose exec vermogen-app node apps/api/dist/cli.js cadastrar-configuracao-inicial
+```
+
+Depois confira as contas na tela **Contas**.
+
 ## 3. Medir a memória (QA-12)
 
 Use o app por alguns minutos (entre, navegue pelas telas, cadastre algo). Depois:
