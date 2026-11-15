@@ -1,0 +1,100 @@
+/* Peças comuns da projeção e da abertura do ciclo (protótipo 03). Incluído com <style scoped src>. */
+.tabela {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: left;
+  padding: 0 10px 10px 0;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+th.r,
+td.r {
+  text-align: right;
+}
+td {
+  padding: 11px 10px 11px 0;
+  border-top: 1px solid var(--faint);
+  vertical-align: middle;
+}
+th:last-child,
+td:last-child {
+  padding-right: 0;
+}
+td.m,
+.m {
+  color: var(--muted);
+}
+
+/* DS-06: cor da instituição na lateral esquerda da linha. */
+tr.bk > td:first-child {
+  box-shadow: inset 3px 0 0 var(--bk);
+  padding-left: 12px;
+}
+
+/* DS-07: linha de agregado que abre os itens. */
+tr.click {
+  cursor: pointer;
+}
+tr.click:hover > td {
+  background: rgba(255, 255, 255, 0.02);
+}
+tr.click > td:first-child::after {
+  content: '▸';
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 10px;
+}
+tr.click.open > td:first-child::after {
+  content: '▾';
+}
+tr.det > td {
+  padding: 0;
+  border-top: 0;
+}
+
+.chip.ok {
+  background: rgba(0, 204, 75, 0.13);
+  color: var(--in);
+}
+.chip.warn {
+  background: rgba(254, 206, 76, 0.13);
+  color: var(--pending);
+}
+.chip.bad {
+  background: rgba(255, 107, 91, 0.14);
+  color: var(--out);
+}
+.chip.mcp {
+  background: rgba(91, 168, 255, 0.13);
+  color: var(--info);
+}
+.pos {
+  color: var(--in);
+}
+.neg {
+  color: var(--out);
+}
+.pend {
+  color: var(--pending);
+}
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 10px;
+  vertical-align: 1px;
+}
+.grow {
+  flex: 1;
+}
