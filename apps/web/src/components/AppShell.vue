@@ -10,9 +10,12 @@ const router = useRouter()
 /** Itens do menu já disponíveis (DM-03); os demais entram com as próximas entregas. */
 const itens = [
   { nome: 'inicio', rotulo: 'Início' },
+  { nome: 'abertura', rotulo: 'Abertura do ciclo', curto: 'Abertura' },
+  { nome: 'projecao', rotulo: 'Projeção' },
   { nome: 'transacoes', rotulo: 'Transações' },
-  { nome: 'contas', rotulo: 'Contas' },
-  { nome: 'configuracoes', rotulo: 'Configurações' },
+  // DS-10: a barra do celular tem 5 itens; Contas (cadastro raro) fica só no desktop.
+  { nome: 'contas', rotulo: 'Contas', soDesktop: true },
+  { nome: 'configuracoes', rotulo: 'Configurações', curto: 'Ajustes' },
 ]
 
 async function sair() {
@@ -25,8 +28,14 @@ async function sair() {
   <div class="shell">
     <aside>
       <div class="brand"><i aria-hidden="true"></i>Vermögen</div>
-      <RouterLink v-for="item in itens" :key="item.nome" :to="{ name: item.nome }" active-class="on">
-        {{ item.rotulo }}
+      <RouterLink
+        v-for="item in itens"
+        :key="item.nome"
+        :to="{ name: item.nome }"
+        active-class="on"
+        :class="{ 'so-desktop': item.soDesktop }"
+      >
+        <span class="longo">{{ item.rotulo }}</span><span class="curto">{{ item.curto ?? item.rotulo }}</span>
       </RouterLink>
       <div class="sp"></div>
       <button type="button" @click="sair">Sair</button>
@@ -94,6 +103,9 @@ aside button:hover {
 .sp {
   flex: 1;
 }
+.curto {
+  display: none;
+}
 main {
   padding: 0 32px 40px;
   min-width: 0;
@@ -129,6 +141,13 @@ main {
 
 /* DS-10: até 760 px, o menu lateral vira barra inferior. */
 @media (max-width: 760px) {
+  aside a.so-desktop,
+  .longo {
+    display: none;
+  }
+  .curto {
+    display: inline;
+  }
   .shell {
     display: block;
   }

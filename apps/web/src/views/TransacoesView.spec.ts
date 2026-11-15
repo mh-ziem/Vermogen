@@ -54,7 +54,7 @@ function responder(url: string, init?: RequestInit) {
 async function montar() {
   const router = createRouter({ history: createMemoryHistory(), routes: [
       { path: '/transacoes', name: 'transacoes', component: TransacoesView },
-      ...['inicio', 'contas', 'configuracoes', 'login'].map((name) => ({ path: `/${name}`, name, component: { template: '<p/>' } })),
+      ...['inicio', 'abertura', 'projecao', 'contas', 'configuracoes', 'login'].map((name) => ({ path: `/${name}`, name, component: { template: '<p/>' } })),
     ],
   })
   await router.push('/transacoes')
